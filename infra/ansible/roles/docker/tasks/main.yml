@@ -1,0 +1,65 @@
+# Docker Engine and the Compose plugin from Docker's own apt repository.
+# Unattended upgrades cover only Ubuntu's security updates, so Docker updates
+# when this role runs, not by itself.
+- name: apt key folder
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Docker's apt key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Docker's apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    filename: docker
+    state: present
+  # Needs the key above; a dry run doesn't download it.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Docker config folder
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: "0755"
+
+- name: Docker daemon settings
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: Restart docker
+
+- name: Docker Engine and plugins
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+  # Needs the repository above; a dry run doesn't add it.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Docker runs on boot
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: deploy and ops run containers
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: [docker]
+    append: true
+  loop: [deploy, ops]
+  ignore_errors: "{{ ansible_check_mode }}"

@@ -1,0 +1,31 @@
+# The owner's keys for ops, read from this computer. The list is exclusive: a
+# key removed here is removed from the server.
+ops_authorized_keys:
+  - "{{ lookup('file', '~/.ssh/nexus_ops.pub') }}"
+
+# CI's key; its private half is DEPLOY_SSH_KEY in the production environment.
+# It can only run the deploy gate.
+deploy_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ+Xw7ZzVJKGgdN4/n899Xalng4aI45/notYhL4s2M9Z github-actions-deploy@nexus
+
+# The repository this playbook is in; the release scripts are copied from it.
+repo_root: "{{ playbook_dir }}/../.."
+
+nexus_root: /srv/nexus
+
+swap_size_mb: 2048
+timezone: UTC
+journald_max_use: 500M
+# Calls run between 09:00 and 20:00 Algiers time (UTC+1), so a reboot at
+# 04:30 UTC interrupts none.
+unattended_reboot_time: "04:30"
+
+# Asterisk uses the host network, so its call-audio range is opened here.
+# Only Caddy publishes ports (80 and 443, once the API is served).
+firewall_allowed:
+  - { rule: limit, port: "22", proto: tcp }
+  - { rule: allow, port: "10000:10199", proto: udp }
+
+# The deploy script checks every image's signature with it.
+cosign_version: "2.4.1"
+cosign_deb_sha256: 3df2fbb174e0696e38fd5e24dd0e2d97d0a28fbb01329b786f5839ce0abe2e4e

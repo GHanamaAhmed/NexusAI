@@ -1,0 +1,98 @@
+# Every push to main is checked, built, signed and released to the server.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: ci
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Secrets are set
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VOIP_LINES: ${{ secrets.VOIP_LINES }}
+          PROVIDER_HOST: ${{ vars.PROVIDER_HOST }}
+        run: |
+          for name in GEMINI_API_KEY VOIP_LINES PROVIDER_HOST; do
+            [[ -n ${!name} ]] || { echo "::error::$name is not set: add it in Settings, Environments, production"; exit 1; }
+          done
+
+      # CI's key can only run the deploy gate on the server; the server's host
+      # key is pinned.
+      - name: Server SSH
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          for name in HOST PRIVATE_KEY KNOWN_HOSTS; do
+            [[ -n ${!name} ]] || { echo "::error::The server's SSH secrets are not set ($name is empty)"; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PRIVATE_KEY" > ~/.ssh/nexus
+          chmod 600 ~/.ssh/nexus
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CONFIG
+          Host nexus
+            HostName $HOST
+            User deploy
+            IdentityFile ~/.ssh/nexus
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ServerAliveInterval 30
+          CONFIG
+
+      # The registry token, then the settings and secrets, go on stdin: never
+      # on a command line or in the log.
+      - name: Release
+        env:
+          TOKEN: ${{ github.token }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VOIP_LINES: ${{ secrets.VOIP_LINES }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+          PROVIDER_HOST: ${{ vars.PROVIDER_HOST }}
+          DIAL_FORMAT: ${{ vars.DIAL_FORMAT }}
+          VOICE_AR: ${{ vars.VOICE_AR }}
+          VOICE_FR: ${{ vars.VOICE_FR }}
+        run: |
+          # The sha is meant to expand here, on the runner.
+          # shellcheck disable=SC2029
+          {
+            printf '%s\n' "$TOKEN"
+            printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY"
+            printf 'VOIP_LINES_B64=%s\n' "$(printf '%s' "$VOIP_LINES" | base64 -w0)"
+            for name in HEALTHCHECK_URL PROVIDER_HOST DIAL_FORMAT VOICE_AR VOICE_FR; do
+              printf '%s=%s\n' "$name" "${!name}"
+            done
+          } | ssh nexus deploy "$GITHUB_SHA"
+
+      - name: Summary
+        if: always()
+        run: ssh nexus status < /dev/null >> "$GITHUB_STEP_SUMMARY" || true

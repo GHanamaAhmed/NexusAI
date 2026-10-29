@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# Releases NexusAI on this server. The server playbook installs it as
+# /srv/nexus/bin/deploy; CI runs it through the deploy gate, and ops can run it
+# as deploy (sudo -u deploy /srv/nexus/bin/deploy status).
+#
+#   deploy <version>       check, pull and start a release (the commit sha)
+#   rollback [<version>]   go back to the previous release, or the one named
+#   status                 the running release and its containers
+#
+# deploy reads stdin: the first line is a registry token, the rest are the
+# release's KEY=value settings and secrets, which apply-secrets writes.
+set -euo pipefail
+
+ROOT=${NEXUS_ROOT:-/srv/nexus}
+REPO=GHanamaAhmed/NexusAI
+REGISTRY=ghcr.io/ghanamaahmed
+IMAGES=(asterisk)
+# Only images signed by this repository's build workflow on main are run.
+SIGNER="^https://github\\.com/$REPO/\\.github/workflows/build\\.yml@refs/heads/main\$"
+ISSUER=https://token.actions.githubusercontent.com
+RELEASES=$ROOT/releases
+KEEP_RELEASES=5
+REGISTER_TIMEOUT=120
+
+log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+die() {
+  log "error: $*" >&2
+  exit 1
+}
+
+ACTION=${1:-}
+VERSION=${2:-}
+case "$ACTION" in
+  deploy) [[ $VERSION =~ ^[0-9a-f]{40}$ ]] || die "usage: deploy <40-character commit sha>" ;;
+  rollback) [[ -z $VERSION || $VERSION =~ ^[0-9a-f]{40}$ ]] || die "usage: rollback [<commit sha>]" ;;
+  status) ;;
+  *) die "usage: deploy <version> | rollback [<version>] | status" ;;
+esac
+
+dc() {
+  local release=$1
+  shift
+  docker compose -p nexus -f "$RELEASES/$release.compose.yml" \
+    --env-file "$ROOT/.env" --env-file "$ROOT/internal.env" \
+    --env-file "$RELEASES/$release.env" "$@"
+}
+
+current_release() { cat "$RELEASES/current" 2>/dev/null || true; }
+
+previous_release() {
+  local current
+  current=$(current_release)
+  awk -F'\t' -v current="$current" '$3 != current { release = $3 } END { print release }' \
+    "$RELEASES/releases.log" 2>/dev/null || true
+}
+
+# Logs in to the registry for this run only; the token is never stored.
+registry_login() {
+  local token=$1
+  DOCKER_CONFIG=$(mktemp -d)
+  export DOCKER_CONFIG
+  trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+  printf '%s\n' "$token" | docker login ghcr.io --username deploy --password-stdin >/dev/null
+}
+
+# The image's digest, once its signature checks out.
+verified_digest() {
+  local ref=$1 digest
+  digest=$(cosign verify --certificate-identity-regexp "$SIGNER" \
+    --certificate-oidc-issuer "$ISSUER" --output json "$ref" 2>/dev/null |
+    jq -r '.[0].critical.image."docker-manifest-digest"') || die "$ref has no valid signature"
+  [[ $digest == sha256:* ]] || die "$ref has no valid signature"
+  log "verified $ref"
+  printf '%s@%s\n' "${ref%:*}" "$digest"
+}
+
+prepare_release() {
+  local version=$1 image ref pinned tmp
+  tmp=$(mktemp)
+  for image in "${IMAGES[@]}"; do
+    ref="$REGISTRY/nexus-$image:$version"
+    pinned=$(verified_digest "$ref")
+    for attempt in 1 2 3; do
+      docker pull --quiet "$pinned" >/dev/null && break
+      [[ $attempt == 3 ]] && die "could not pull $pinned"
+      sleep $((attempt * 10))
+    done
+    printf '%s_IMAGE=%s\n' "${image^^}" "$pinned" >>"$tmp"
+  done
+  # A commit's files never change, so the release's compose file is fetched
+  # by its sha.
+  curl -fsSL --retry 3 -o "$RELEASES/$version.compose.yml" \
+    "https://raw.githubusercontent.com/$REPO/$version/deploy/compose.yml" ||
+    die "could not fetch deploy/compose.yml at $version"
+  mv "$tmp" "$RELEASES/$version.env"
+}
+
+# Every line must be signed in with the provider.
+wait_registered() {
+  local release=$1 deadline=$((SECONDS + REGISTER_TIMEOUT)) report total registered
+  while ((SECONDS < deadline)); do
+    report=$(dc "$release" exec -T asterisk asterisk -rx "pjsip show registrations" 2>/dev/null || true)
+    total=$(grep -c -- '-reg/' <<<"$report" || true)
+    registered=$(grep -c 'Registered' <<<"$report" || true)
+    if ((total > 0 && registered == total)); then
+      log "$registered of $total lines registered"
+      return 0
+    fi
+    sleep 5
+  done
+  log "only ${registered:-0} of ${total:-0} lines registered after ${REGISTER_TIMEOUT}s"
+  dc "$release" logs --tail 40 asterisk || true
+  return 1
+}
+
+start_release() {
+  local release=$1
+  dc "$release" up -d --remove-orphans
+  if [[ ${RESTART_ASTERISK:-} == yes ]]; then
+    dc "$release" restart asterisk
+  fi
+  wait_registered "$release"
+}
+
+record_release() {
+  local release=$1 action=$2
+  printf '%s\n' "$release" >"$RELEASES/current.tmp"
+  mv "$RELEASES/current.tmp" "$RELEASES/current"
+  printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$action" "$release" >>"$RELEASES/releases.log"
+}
+
+prune_releases() {
+  local keep release
+  keep=$(awk -F'\t' '{ print $3 }' "$RELEASES/releases.log" | tac | awk '!seen[$0]++' | head -n "$KEEP_RELEASES")
+  for file in "$RELEASES"/*.env; do
+    release=$(basename "$file" .env)
+    grep -qx "$release" <<<"$keep" && continue
+    rm -f "$RELEASES/$release.env" "$RELEASES/$release.compose.yml"
+  done
+  docker image prune -f >/dev/null
+}
+
+do_deploy() {
+  local token previous changes
+  IFS= read -r token || die "no registry token on stdin"
+  changes=$(sudo -n "$ROOT/bin/apply-secrets") || die "the settings and secrets were refused"
+  [[ $changes == *lines-changed* ]] && RESTART_ASTERISK=yes
+
+  previous=$(current_release)
+  registry_login "$token"
+  prepare_release "$VERSION"
+  log "starting $VERSION"
+  if start_release "$VERSION"; then
+    record_release "$VERSION" deploy
+    prune_releases
+    log "released $VERSION"
+    return 0
+  fi
+  if [[ -n $previous && $previous != "$VERSION" && -f $RELEASES/$previous.env ]]; then
+    log "going back to $previous"
+    start_release "$previous" || true
+    record_release "$previous" auto-rollback
+    die "$VERSION failed and was rolled back to $previous"
+  fi
+  die "$VERSION failed"
+}
+
+do_rollback() {
+  local target=${VERSION:-$(previous_release)}
+  [[ -n $target ]] || die "there is no earlier release"
+  [[ $target != "$(current_release)" ]] || die "$target is already running"
+  [[ -f $RELEASES/$target.env ]] || die "$target's release files are gone; deploy it again"
+  start_release "$target" || die "$target did not start"
+  record_release "$target" rollback
+  log "rolled back to $target"
+}
+
+do_status() {
+  local current
+  current=$(current_release)
+  printf 'release: %s\n' "${current:-none}"
+  [[ -n $current ]] && dc "$current" ps
+  tail -n 5 "$RELEASES/releases.log" 2>/dev/null || true
+}
+
+if [[ $ACTION == status ]]; then
+  do_status
+  exit 0
+fi
+
+exec 9>"$RELEASES/.lock"
+flock -w 900 9 || die "another release is running"
+case "$ACTION" in
+  deploy) do_deploy ;;
+  rollback) do_rollback ;;
+esac

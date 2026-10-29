@@ -1,0 +1,27 @@
+# NexusAI on one server. Settings and secrets live in /srv/nexus (see
+# deploy/README.md); nothing here holds a number, password or address.
+name: nexus
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  # Signs in the phone lines and carries the calls. Host networking, because
+  # RTP uses a port range and ARI listens on localhost only.
+  asterisk:
+    image: ${ASTERISK_IMAGE:?}
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /srv/nexus/asterisk:/etc/asterisk/lines:ro
+      - /srv/nexus/sounds:/var/lib/asterisk/sounds/nexus:ro
+      - asterisk-run:/var/run/asterisk
+      - asterisk-spool:/var/spool/asterisk
+    logging: *logging
+
+volumes:
+  asterisk-run:
+  asterisk-spool:

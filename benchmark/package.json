@@ -1,0 +1,16 @@
+{
+  "name": "@nexus/benchmark",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render-samples": "tsx render-samples.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^2.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15"
+  }
+}

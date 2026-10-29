@@ -1,0 +1,120 @@
+#!/bin/sh
+# Writes Asterisk's per-server files into /srv/nexus/asterisk from:
+#   /srv/nexus/secrets/lines.txt  one "<number> <password>" per line, the
+#                                 number as the provider spells the account
+#                                 (for example 2139800000000)
+#   /srv/nexus/.env               PROVIDER_HOST=<ip>:<port>
+#   /srv/nexus/internal.env       ARI_PASSWORD, made by the server playbook
+# apply-secrets runs it during a release when any of these changed. Nothing it
+# writes belongs in Git: line numbers, passwords, the TLS key.
+set -eu
+
+ROOT=${NEXUS_ROOT:-/srv/nexus}
+LINES=$ROOT/secrets/lines.txt
+OUT=$ROOT/asterisk
+AST_ID=2000 # the asterisk user and group in the image
+
+fail() {
+  echo "make-lines: $*" >&2
+  exit 1
+}
+
+[ -r "$LINES" ] || fail "missing $LINES (one '<number> <password>' per line)"
+[ -r "$ROOT/.env" ] || fail "missing $ROOT/.env"
+[ -r "$ROOT/internal.env" ] || fail "missing $ROOT/internal.env (run the server playbook)"
+
+# setting <file> <name>
+setting() { sed -n "s/^$2=//p" "$1" | tail -n 1; }
+
+PROVIDER_HOST=$(setting "$ROOT/.env" PROVIDER_HOST)
+[ -n "$PROVIDER_HOST" ] || fail "PROVIDER_HOST=<ip>:<port> is missing from $ROOT/.env"
+PROVIDER_IP=${PROVIDER_HOST%:*}
+
+ARI_PASSWORD=$(setting "$ROOT/internal.env" ARI_PASSWORD)
+[ -n "$ARI_PASSWORD" ] || fail "ARI_PASSWORD is missing from $ROOT/internal.env"
+ARI_HASH=$(printf '%s' "$ARI_PASSWORD" | openssl passwd -6 -stdin)
+
+umask 077
+mkdir -p "$OUT/tls"
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# A self-signed certificate for the TLS transport. The provider doesn't check
+# it; Asterisk only needs one to start TLS.
+if [ ! -s "$OUT/tls/cert.pem" ]; then
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=nexus-sip" \
+    -keyout "$OUT/tls/key.pem" -out "$OUT/tls/cert.pem" 2>/dev/null
+fi
+
+n=0
+while read -r number password _; do
+  case "$number" in '' | '#'*) continue ;; esac
+  [ -n "$password" ] || fail "line $((n + 1)) of $LINES has no password"
+  n=$((n + 1))
+  id=$(printf 'line%02d' "$n")
+
+  cat >>"$TMP/pjsip_lines.conf" <<EOF
+[$id-reg](line-reg-tpl)
+server_uri=sip:$PROVIDER_HOST\;transport=tls
+client_uri=sip:$number@$PROVIDER_HOST\;transport=tls
+outbound_auth=$id-auth
+contact_user=$number
+
+[$id-aor]
+type=aor
+contact=sip:$PROVIDER_HOST\;transport=tls
+qualify_frequency=0
+
+[$id](line-ep-tpl)
+aors=$id-aor
+outbound_auth=$id-auth
+from_user=$number
+callerid=<$number>
+
+EOF
+
+  cat >>"$TMP/pjsip_secrets.conf" <<EOF
+[$id-auth]
+type=auth
+auth_type=digest
+username=$number
+password=$password
+
+EOF
+done <"$LINES"
+
+[ "$n" -gt 0 ] || fail "no lines in $LINES"
+
+cat >"$TMP/pjsip_provider.conf" <<EOF
+; Calls may only come from the provider, and they are all refused.
+[provider-in]
+type=endpoint
+transport=transport-tls
+context=inbound-reject
+disallow=all
+allow=alaw
+
+[provider-identify]
+type=identify
+endpoint=provider-in
+match=$PROVIDER_IP
+EOF
+
+cat >"$TMP/ari_user.conf" <<EOF
+[nexus]
+type=user
+read_only=no
+password_format=crypt
+password=$ARI_HASH
+deny=0.0.0.0/0.0.0.0
+permit=127.0.0.1
+EOF
+
+for file in pjsip_lines.conf pjsip_secrets.conf pjsip_provider.conf ari_user.conf; do
+  install -m 0600 -o "$AST_ID" -g "$AST_ID" "$TMP/$file" "$OUT/$file"
+done
+chown -R "$AST_ID:$AST_ID" "$OUT/tls"
+chmod 0700 "$OUT" "$OUT/tls"
+chown "$AST_ID:$AST_ID" "$OUT"
+
+echo "make-lines: wrote $n lines for $PROVIDER_HOST into $OUT"

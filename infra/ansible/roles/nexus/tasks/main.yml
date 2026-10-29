@@ -1,0 +1,78 @@
+# What releases need: cosign to check image signatures, the release scripts,
+# the folders, and the passwords the server makes for itself. The owner's keys
+# and the line passwords come with each release from the GitHub environment
+# (apply-secrets), never from here.
+- name: cosign package
+  ansible.builtin.get_url:
+    url: "https://github.com/sigstore/cosign/releases/download/v{{ cosign_version }}/cosign_{{ cosign_version }}_amd64.deb"
+    dest: "/var/cache/apt/archives/cosign_{{ cosign_version }}_amd64.deb"
+    checksum: "sha256:{{ cosign_deb_sha256 }}"
+    mode: "0644"
+
+- name: cosign
+  ansible.builtin.apt:
+    deb: "/var/cache/apt/archives/cosign_{{ cosign_version }}_amd64.deb"
+  # Needs the download above; a dry run doesn't download it.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Folders
+  ansible.builtin.file:
+    path: "{{ nexus_root }}/{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: secrets, owner: root, group: root, mode: "0700" }
+    - { path: releases, owner: deploy, group: deploy, mode: "0750" }
+    - { path: sounds, owner: root, group: root, mode: "0755" }
+    - { path: backups, owner: root, group: root, mode: "0700" }
+  # Needs the users above; a dry run doesn't create them.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Release scripts
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/{{ item.src }}"
+    dest: "{{ nexus_root }}/bin/{{ item.name }}"
+    owner: root
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: deploy/bin/deploy, name: deploy, group: deploy, mode: "0750" }
+    - {
+        src: deploy/bin/apply-secrets,
+        name: apply-secrets,
+        group: root,
+        mode: "0700",
+      }
+    - {
+        src: deploy/asterisk/make-lines,
+        name: make-lines,
+        group: root,
+        mode: "0700",
+      }
+  # Needs the users above; a dry run doesn't create them.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: deploy may apply the release's settings and secrets as root, nothing else
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/60-nexus-deploy
+    content: "deploy ALL=(root) NOPASSWD: {{ nexus_root }}/bin/apply-secrets\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+# Generated on the first run and never replaced.
+- name: Internal passwords
+  ansible.builtin.copy:
+    dest: "{{ nexus_root }}/internal.env"
+    content: |
+      # Made by the server playbook (role nexus) on its first run; never
+      # replaced. Read by the release with .env.
+      ARI_PASSWORD={{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}
+    owner: root
+    group: deploy
+    mode: "0640"
+    force: false
+  no_log: true
+  # Needs the users above; a dry run doesn't create them.
+  ignore_errors: "{{ ansible_check_mode }}"

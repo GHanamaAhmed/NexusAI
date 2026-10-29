@@ -1,0 +1,32 @@
+#!/bin/sh
+# Forced command for CI's SSH key (see authorized_keys of deploy). It allows
+# only deploy, rollback and status with plain arguments, and hands them to the
+# deploy script; anything else is refused.
+set -eu
+
+cmd="${SSH_ORIGINAL_COMMAND:-}"
+case "$cmd" in
+  *[!a-zA-Z0-9\ ._:@/=-]*)
+    echo "deploy-gate: refused characters in command" >&2
+    exit 64
+    ;;
+esac
+
+# Split into words on purpose; the check above leaves no glob characters.
+set -f
+# shellcheck disable=SC2086
+set -- $cmd
+case "${1:-}" in
+  deploy | rollback | status) ;;
+  *)
+    echo "deploy-gate: only deploy, rollback and status are allowed" >&2
+    exit 64
+    ;;
+esac
+
+script="$(dirname "$0")/deploy"
+if [ ! -x "$script" ]; then
+  echo "deploy-gate: the deploy script is not installed yet" >&2
+  exit 69
+fi
+exec "$script" "$@"

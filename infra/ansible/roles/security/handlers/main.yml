@@ -1,0 +1,17 @@
+- name: Check the ssh settings
+  listen: Reload ssh
+  ansible.builtin.command: sshd -t
+  changed_when: false
+
+- name: Reload the ssh service
+  listen: Reload ssh
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+
+- name: Restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  # A dry run doesn't install it.
+  ignore_errors: "{{ ansible_check_mode }}"

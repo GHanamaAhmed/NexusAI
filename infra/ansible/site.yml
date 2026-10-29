@@ -1,0 +1,12 @@
+# Sets up the NexusAI server. Safe to run again; a second run changes nothing.
+- name: NexusAI server
+  hosts: nexus
+  become: true
+  roles:
+    - { role: base, tags: base }
+    # Users first: ops must be able to sign in before password login is closed.
+    - { role: users, tags: users }
+    - { role: docker, tags: docker }
+    - { role: security, tags: security }
+    # Folders, the release scripts and the generated passwords.
+    - { role: nexus, tags: nexus }

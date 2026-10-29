@@ -1,0 +1,11 @@
+# One server. The first run connects as the cloud image's own account, the
+# only one with a key before this playbook:
+#   ansible-playbook site.yml -e ansible_user=admin7978 -e ansible_ssh_private_key_file=~/.ssh/icosnet_vps
+# Every later run connects as ops:
+#   ansible-playbook site.yml
+all:
+  hosts:
+    nexus:
+      ansible_host: 197.140.9.247
+      ansible_user: ops
+      ansible_ssh_private_key_file: ~/.ssh/nexus_ops

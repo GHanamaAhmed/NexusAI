@@ -1,0 +1,63 @@
+# Runs after users: ops already signs in with its key, so closing root and
+# password login can't lock the owner out. The cloud image's account keeps its
+# password for the provider's web console only.
+- name: ops has a key before SSH is locked down
+  ansible.builtin.stat:
+    path: /home/ops/.ssh/authorized_keys
+  register: ops_keys
+  # A dry run on a new server has no ops yet.
+  failed_when: not ansible_check_mode and (not ops_keys.stat.exists or ops_keys.stat.size == 0)
+
+- name: SSH accepts keys only, for ops and deploy
+  ansible.builtin.template:
+    src: sshd-nexus.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-nexus.conf
+    mode: "0644"
+    validate: "sshd -t -f %s"
+  notify: Reload ssh
+
+- name: Security packages
+  ansible.builtin.apt:
+    name: [ufw, fail2ban]
+    state: present
+
+- name: fail2ban watches SSH
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.d/sshd.local
+    content: |
+      [sshd]
+      enabled = true
+      backend = systemd
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: fail2ban runs
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+  # Needs the package above; a dry run doesn't install it.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Firewall rules
+  ansible.builtin.command: "ufw {{ item.rule }} {{ item.port }}/{{ item.proto }}"
+  loop: "{{ firewall_allowed }}"
+  register: ufw_rules
+  changed_when: "'Skipping' not in ufw_rules.stdout"
+
+- name: Firewall state
+  ansible.builtin.command: ufw status verbose
+  register: ufw_status
+  changed_when: false
+  check_mode: false
+
+- name: Firewall denies everything else coming in
+  ansible.builtin.command: ufw default deny incoming
+  when: "'deny (incoming)' not in ufw_status.stdout"
+
+- name: Firewall on
+  ansible.builtin.command: ufw --force enable
+  when: "'Status: active' not in ufw_status.stdout"

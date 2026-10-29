@@ -1,0 +1,81 @@
+# Builds the images, scans them and signs them. Called by deploy.yml; the
+# server runs an image only if this workflow on main signed it.
+name: Build images
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write # keyless signing
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Asterisk
+        id: asterisk
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/asterisk
+          push: true
+          tags: ghcr.io/ghanamaahmed/nexus-asterisk:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=asterisk
+          cache-to: type=gha,scope=asterisk,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Image references
+        id: refs
+        env:
+          ASTERISK: ghcr.io/ghanamaahmed/nexus-asterisk@${{ steps.asterisk.outputs.digest }}
+        run: printf '%s\n' "$ASTERISK" > images.txt
+
+      # Fails on CRITICAL vulnerabilities that have a fix; the table is in the
+      # log.
+      - name: Scan images
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A pinned release, checked against its checksum (no install script).
+          version=0.75.0
+          sha256=c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+          curl -sSfL -o /tmp/trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Linux-64bit.tar.gz"
+          echo "$sha256  /tmp/trivy.tar.gz" | sha256sum -c -
+          sudo tar xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
+          status=0
+          while read -r ref; do
+            echo "::group::$ref"
+            trivy image --quiet --severity CRITICAL --ignore-unfixed --exit-code 1 --scanners vuln "$ref" || status=1
+            echo "::endgroup::"
+          done < images.txt
+          exit $status
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # The same cosign as the server (cosign_version in the playbook), so
+          # the server can read the signatures. Upgrade both together.
+          cosign-release: v2.4.1
+
+      # Keyless: the signature names this workflow on this repository, which
+      # is what the server checks. No signing key to keep.
+      - name: Sign images
+        run: |
+          while read -r ref; do
+            cosign sign --yes "$ref"
+          done < images.txt

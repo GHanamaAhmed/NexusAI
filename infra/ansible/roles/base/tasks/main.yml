@@ -1,0 +1,83 @@
+- name: Current time zone
+  ansible.builtin.command: timedatectl show -p Timezone --value
+  register: current_timezone
+  changed_when: false
+  check_mode: false
+
+- name: Time zone
+  ansible.builtin.command: "timedatectl set-timezone {{ timezone }}"
+  when: current_timezone.stdout != timezone
+
+- name: Base packages
+  ansible.builtin.apt:
+    name:
+      - unattended-upgrades
+      - ca-certificates
+      - curl
+      - gnupg
+      - jq
+      - htop
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Swapfile
+  ansible.builtin.command:
+    cmd: "fallocate -l {{ swap_size_mb }}M /swapfile"
+    creates: /swapfile
+  register: swapfile
+
+- name: Swapfile permissions
+  ansible.builtin.file:
+    path: /swapfile
+    mode: "0600"
+  # Created by the task above; a dry run doesn't create it.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Format and enable the swapfile
+  ansible.builtin.shell: mkswap /swapfile && swapon /swapfile
+  when: swapfile.changed
+
+- name: Swapfile on boot
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "/swapfile none swap sw 0 0"
+
+- name: Swap only under memory pressure
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    value: "10"
+    sysctl_file: /etc/sysctl.d/60-nexus.conf
+
+- name: Journal drop-in folder
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Journal size cap
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/60-nexus.conf
+    content: |
+      [Journal]
+      SystemMaxUse={{ journald_max_use }}
+    mode: "0644"
+  notify: Restart journald
+
+- name: Security updates install on their own
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    mode: "0644"
+
+- name: Reboot after updates when needed, outside call hours
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/52nexus-unattended-upgrades
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "{{ unattended_reboot_time }}";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+    mode: "0644"
