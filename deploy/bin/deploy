@@ -22,9 +22,10 @@ RELEASES=$ROOT/releases
 KEEP_RELEASES=5
 REGISTER_TIMEOUT=120
 
-log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+# Messages go to stderr, so functions can return values on stdout.
+log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
 die() {
-  log "error: $*" >&2
+  log "error: $*"
   exit 1
 }
 
