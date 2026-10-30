@@ -43,4 +43,8 @@ jobs:
           cd infra/ansible && ansible-playbook site.yml --syntax-check
 
       - name: Compose file
-        run: ASTERISK_IMAGE=example docker compose -f deploy/compose.yml config -q
+        env:
+          ASTERISK_IMAGE: example
+          PROVIDER_ROUTE_NAME: sip.example.com
+          PROVIDER_IP: 192.0.2.1
+        run: docker compose -f deploy/compose.yml config -q

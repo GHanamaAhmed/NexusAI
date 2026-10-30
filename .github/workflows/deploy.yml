@@ -38,8 +38,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VOIP_LINES: ${{ secrets.VOIP_LINES }}
           PROVIDER_HOST: ${{ vars.PROVIDER_HOST }}
+          PROVIDER_ROUTE_NAME: ${{ vars.PROVIDER_ROUTE_NAME }}
         run: |
-          for name in GEMINI_API_KEY VOIP_LINES PROVIDER_HOST; do
+          for name in GEMINI_API_KEY VOIP_LINES PROVIDER_HOST PROVIDER_ROUTE_NAME; do
             [[ -n ${!name} ]] || { echo "::error::$name is not set: add it in Settings, Environments, production"; exit 1; }
           done
 
@@ -78,6 +79,7 @@ jobs:
           VOIP_LINES: ${{ secrets.VOIP_LINES }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
           PROVIDER_HOST: ${{ vars.PROVIDER_HOST }}
+          PROVIDER_ROUTE_NAME: ${{ vars.PROVIDER_ROUTE_NAME }}
           DIAL_FORMAT: ${{ vars.DIAL_FORMAT }}
           VOICE_AR: ${{ vars.VOICE_AR }}
           VOICE_FR: ${{ vars.VOICE_FR }}
@@ -88,7 +90,7 @@ jobs:
             printf '%s\n' "$TOKEN"
             printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY"
             printf 'VOIP_LINES_B64=%s\n' "$(printf '%s' "$VOIP_LINES" | base64 -w0)"
-            for name in HEALTHCHECK_URL PROVIDER_HOST DIAL_FORMAT VOICE_AR VOICE_FR; do
+            for name in HEALTHCHECK_URL PROVIDER_HOST PROVIDER_ROUTE_NAME DIAL_FORMAT VOICE_AR VOICE_FR; do
               printf '%s=%s\n' "$name" "${!name}"
             done
           } | ssh nexus deploy "$GITHUB_SHA"

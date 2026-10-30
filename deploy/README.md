@@ -28,6 +28,7 @@ They live in GitHub, under Settings, Environments, `production`. Change one ther
 | `HEALTHCHECK_URL`                                     | secret   | The health check's ping address (optional)                                                   |
 | `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST` | secret   | CI's key, the server's pinned host key, its address                                          |
 | `PROVIDER_HOST`                                       | variable | The provider's SIP address, `<ip>:<port>`                                                    |
+| `PROVIDER_ROUTE_NAME`                                 | variable | The host name in the provider's routing headers, pinned to `PROVIDER_HOST`'s address         |
 | `DIAL_FORMAT`                                         | variable | `national` (`0XXXXXXXXX`) or `international` (`213XXXXXXXXX`)                                |
 | `VOICE_AR`, `VOICE_FR`                                | variable | The Gemini voices for Darija and French                                                      |
 

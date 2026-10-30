@@ -15,6 +15,11 @@ services:
     image: ${ASTERISK_IMAGE:?}
     network_mode: host
     restart: unless-stopped
+    # The provider's routing headers name a host that public DNS resolves to
+    # other machines. Requests inside a call must reach the one handling it;
+    # otherwise it never sees the ACK and drops the audio after 32 seconds.
+    extra_hosts:
+      - "${PROVIDER_ROUTE_NAME:?}:${PROVIDER_IP:?}"
     volumes:
       - /srv/nexus/asterisk:/etc/asterisk/lines:ro
       - /srv/nexus/sounds:/var/lib/asterisk/sounds/nexus:ro
