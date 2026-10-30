@@ -1,0 +1,19 @@
+# Postgres for local development and tests. Start it with:
+#   docker compose -f deploy/compose.dev.yml up -d
+name: nexus-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus
+      POSTGRES_DB: nexus
+    ports:
+      - 127.0.0.1:5434:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+volumes:
+  postgres:
