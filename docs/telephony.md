@@ -25,4 +25,8 @@ Pressing keys on the mobile reaches nothing. On a healthy 72-second call:
 - no SIP `INFO` arrives;
 - the audio holds no DTMF tones.
 
-Other destinations and networks are not tested yet.
+Two Algerian mobile networks behaved the same way, so the limit is in the provider's service. Landlines are not tested. Enabling `telephone-event` is a question for the provider.
+
+## Voices
+
+Chosen by listening on a real call: `Charon` for Darija, `Kore` for French (`VOICE_AR`, `VOICE_FR`). Totals are said in words ("ستة آلاف و خمسمية دينار"), not digits or centimes.
