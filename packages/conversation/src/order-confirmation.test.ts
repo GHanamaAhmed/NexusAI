@@ -4,7 +4,7 @@ import {
   buildInstruction,
   type ConfirmationOrder,
   placeChange,
-  refuseChange,
+  refuseOutcome,
   saidYes,
 } from "./order-confirmation.js"
 
@@ -104,6 +104,30 @@ describe("answerLookup", () => {
     })
   })
 
+  it("doesn't offer the order's own place back", () => {
+    const current = {
+      type: "home",
+      wilaya_code: 16,
+      commune: "باب الزوار",
+    } as const
+    expect(
+      answerLookup(
+        "find_place",
+        { wilaya: "الجزائر", commune: "باب الزوار" },
+        "ar",
+        current
+      )
+    ).toMatchObject({ status: "current_place" })
+    expect(
+      answerLookup(
+        "find_place",
+        { wilaya: "الجزائر", commune: "الشراقة" },
+        "ar",
+        current
+      )
+    ).toMatchObject({ status: "found", commune: "الشراقة" })
+  })
+
   it("leaves the outcome functions alone", () => {
     expect(answerLookup("confirm_order", {}, "ar")).toBeNull()
     expect(answerLookup("request_change", { what: "x" }, "ar")).toBeNull()
@@ -185,15 +209,18 @@ describe("saidYes", () => {
   ])("hears no yes in %s", (words) => expect(saidYes(words)).toBe(false))
 })
 
-describe("refuseChange", () => {
+describe("refuseOutcome", () => {
   const aoulef = [
     answerLookup("find_place", { wilaya: "ادرار", commune: "اولاف" }, "ar")!,
   ]
 
   it("takes a change without a place, or a confirmed one", () => {
-    expect(refuseChange({ what: "بدل البلدية، ما تفهمتش" }, [])).toBeNull()
     expect(
-      refuseChange(
+      refuseOutcome("request_change", { what: "بدل البلدية" }, [])
+    ).toBeNull()
+    expect(
+      refuseOutcome(
+        "request_change",
         { what: "x", wilaya_code: "1", commune: "أولف", yes: "إيه" },
         aoulef
       )
@@ -202,7 +229,35 @@ describe("refuseChange", () => {
 
   it("tells the agent why a place can't pass", () => {
     expect(
-      refuseChange({ what: "x", wilaya_code: "1", commune: "أولف" }, aoulef)
+      refuseOutcome(
+        "request_change",
+        { what: "x", wilaya_code: "1", commune: "أولف" },
+        aoulef
+      )
     ).toContain("hasn't said yes")
+  })
+
+  it("confirms only on a yes", () => {
+    expect(
+      refuseOutcome("confirm_order", { yes: "إيه، ابعثوها" }, [])
+    ).toBeNull()
+    expect(refuseOutcome("confirm_order", { yes: "posar" }, [])).toContain(
+      "isn't a clear yes"
+    )
+    expect(refuseOutcome("confirm_order", {}, [])).toContain(
+      "isn't a clear yes"
+    )
+  })
+
+  it("confirms nothing once the customer has named another place", () => {
+    expect(refuseOutcome("confirm_order", { yes: "إيه" }, aoulef)).toContain(
+      "named another place"
+    )
+    const notFound = [answerLookup("find_place", { wilaya: "x" }, "ar")!]
+    expect(refuseOutcome("confirm_order", { yes: "إيه" }, notFound)).toBeNull()
+  })
+
+  it("leaves the other outcomes alone", () => {
+    expect(refuseOutcome("call_later", { when: "x" }, aoulef)).toBeNull()
   })
 })

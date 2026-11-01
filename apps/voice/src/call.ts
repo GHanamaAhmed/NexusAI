@@ -9,7 +9,7 @@ import {
   outcomeForTool,
   type PlaceChange,
   placeChange,
-  refuseChange,
+  refuseOutcome,
 } from "@nexus/conversation"
 import type { Outcome } from "@nexus/core"
 import type { Ari, AriEvent } from "./ari.js"
@@ -252,7 +252,8 @@ export class Call {
     args: Record<string, unknown>
   ): Record<string, unknown> {
     this.log(`tool: ${name} ${JSON.stringify(args)}`)
-    const lookup = answerLookup(name, args, this.deps.order.customer.language)
+    const { customer, order } = this.deps.order
+    const lookup = answerLookup(name, args, customer.language, order.delivery)
     if (lookup) {
       this.log(`lookup: ${JSON.stringify(lookup)}`)
       this.lookups.push(lookup)
@@ -268,10 +269,9 @@ export class Call {
       this.log(`(ignored ${name}: the outcome is already ${this.outcome})`)
       return { ok: true }
     }
-    const refusal =
-      name === "request_change" ? refuseChange(args, this.lookups) : null
+    const refusal = refuseOutcome(name, args, this.lookups)
     if (refusal) {
-      this.log(`(refused ${name}: no yes to a place the lookup gave)`)
+      this.log(`(refused ${name}: ${refusal})`)
       return { error: refusal }
     }
     this.outcome = outcome

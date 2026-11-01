@@ -107,7 +107,20 @@ When to call each function:
 export const OPENING = "The customer has answered. Start the call now."
 
 export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
-  { name: "confirm_order", description: "The customer confirms the order." },
+  {
+    name: "confirm_order",
+    description: "The customer confirms the order.",
+    parameters: {
+      properties: {
+        yes: {
+          type: "string",
+          description:
+            "The customer's exact words when they said yes to the order.",
+        },
+      },
+      required: ["yes"],
+    },
+  },
   {
     name: "cancel_order",
     description: "The customer repeated that they want to cancel.",
@@ -213,11 +226,17 @@ function text(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-/** Answers a lookup made mid-call; null when the function isn't one (outcome functions aren't). */
+/**
+ * Answers a lookup made mid-call; null when the function isn't one (outcome
+ * functions aren't). The order's own place isn't offered back: said back, it
+ * sounded like a question about the order, and a reply to it was taken for a
+ * yes.
+ */
 export function answerLookup(
   name: string,
   args: Record<string, unknown>,
-  language: Language
+  language: Language,
+  current?: Delivery
 ): Record<string, unknown> | null {
   if (name !== "find_place") {
     return null
@@ -232,6 +251,17 @@ export function answerLookup(
     wilaya: text(args.wilaya),
     commune: text(args.commune),
   })
+  const { place } = result.status === "found" ? result : { place: undefined }
+  if (
+    current &&
+    place?.wilaya.code === current.wilaya_code &&
+    place.commune === resolveCommune(current.wilaya_code, current.commune ?? "")
+  ) {
+    return {
+      status: "current_place",
+      note: "That's where the order already goes. Ask whether they want it there or somewhere else.",
+    }
+  }
   switch (result.status) {
     case "found":
       return { status: "found", ...describe(result.place) }
@@ -268,9 +298,11 @@ function offered(lookups: readonly Record<string, unknown>[]): Offer[] {
 
 const wordSet = (words: string) => new Set(words.split(" "))
 const YES = wordSet(
-  "ايه اه اي يه واه وه صح صحيح صحا نعم ايوا ايوه هيه مليح oui ouais wah ih yes exact exactement voila accord"
+  "ايه اه اي يه واه وه صح صحيح صحا نعم ايوا ايوه هيه مليح بالصح واخا اوكي مرحبا بعثوها ابعثوها بعثها ابعثها ارسلوها oui ouais wah ih yes ok okay bon exact exactement voila accord"
 )
-const NO = wordSet("لا لالا ماشي مش ميش ماهيش ماهوش غلط non no machi")
+const NO = wordSet(
+  "لا لالا ماشي مش ميش ماهيش ماهوش ماكانش بلاش غلط non pas no machi"
+)
 
 /**
  * Whether words the agent heard say yes, with nothing against it. A name said
@@ -319,15 +351,30 @@ export function placeChange(
 }
 
 /**
- * Why request_change can't be taken as it is, to tell the agent so the call
- * goes on, or null when it can.
+ * Why an outcome can't be taken as it is, to tell the agent so the call goes
+ * on, or null when it can. A confirmation needs a yes, and none is taken once
+ * the customer has named another place: on the phone, the agent confirmed an
+ * order whose place the customer was changing. A new place needs a yes to one
+ * the lookup gave.
  */
-export function refuseChange(
+export function refuseOutcome(
+  name: string,
   args: Record<string, unknown>,
   lookups: readonly Record<string, unknown>[]
 ): string | null {
+  if (name === "confirm_order") {
+    const namedAnother = lookups.some((lookup) =>
+      ["found", "choose", "wilaya_only"].includes(String(lookup.status))
+    )
+    if (namedAnother) {
+      return "Not passed: the customer named another place, and confirming would send the order to the old one. Call request_change, or ask them."
+    }
+    return saidYes(text(args.yes))
+      ? null
+      : "Not passed: that isn't a clear yes. Ask them again whether the order can be sent."
+  }
   const namesPlace = text(args.wilaya_code) !== "" || text(args.commune) !== ""
-  return namesPlace && !placeChange(args, lookups)
+  return name === "request_change" && namesPlace && !placeChange(args, lookups)
     ? "Not passed: the customer hasn't said yes to a place find_place gave. Say it back and wait for a yes, or say the store will call and pass no place."
     : null
 }

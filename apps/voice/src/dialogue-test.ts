@@ -7,7 +7,7 @@ import {
   OPENING,
   outcomeForTool,
   placeChange,
-  refuseChange,
+  refuseOutcome,
 } from "@nexus/conversation"
 
 /**
@@ -103,7 +103,7 @@ const SCENARIOS: Scenario[] = [
   },
   {
     name: "no, then a commune alone",
-    customer: ["إيه أنا", "لا لا، بريكة بريكة", "إيه صح", "إيه"],
+    customer: ["إيه أنا", "لا لا، بريكة بريكة", "بريكة", "إيه صح", "إيه"],
     check: movedTo(60, "Barika"),
   },
   {
@@ -162,16 +162,20 @@ async function run(scenario: Scenario): Promise<Result> {
     session.onTool(async ({ name, args }) => {
       console.log(`  tool: ${name} ${JSON.stringify(args)}`)
       result.calls.push({ name, args })
-      const lookup = answerLookup(name, args, order.customer.language)
+      const lookup = answerLookup(
+        name,
+        args,
+        order.customer.language,
+        order.order.delivery
+      )
       if (lookup) {
         console.log(`  lookup: ${JSON.stringify(lookup)}`)
         result.lookups.push(lookup)
         return lookup
       }
-      const refusal =
-        name === "request_change" && !result.outcome
-          ? refuseChange(args, result.lookups)
-          : null
+      const refusal = result.outcome
+        ? null
+        : refuseOutcome(name, args, result.lookups)
       if (refusal) {
         console.log(`  (refused: ${refusal})`)
         return { error: refusal }

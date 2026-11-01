@@ -197,7 +197,7 @@ describe("Call", () => {
   it("stops listening after the answer, and hangs up once the goodbye is heard", async () => {
     await answer()
     greet()
-    expect(await useTool("confirm_order")).toEqual({ ok: true })
+    expect(await useTool("confirm_order", { yes: "إيه" })).toEqual({ ok: true })
     media.onAudio(Buffer.alloc(FRAME))
     expect(sessions[0]!.heard).toHaveLength(0)
     sessions[0]!.audio(Buffer.alloc(FRAME * 50)) // a 1 s goodbye
@@ -276,11 +276,24 @@ describe("Call", () => {
   it("keeps the first answer when the model calls a second one", async () => {
     await answer()
     await useTool("request_change", { what: "بدل البلدية" })
-    await useTool("confirm_order")
+    await useTool("confirm_order", { yes: "إيه" })
     await hangUpNormally()
     expect(await call.done).toMatchObject({
       outcome: "request_change",
       args: { what: "بدل البلدية" },
+    })
+  })
+
+  it("sends back a confirmation without a clear yes, and goes on", async () => {
+    await answer()
+    greet()
+    expect(await useTool("confirm_order", { yes: "posar" })).toMatchObject({
+      error: expect.stringContaining("isn't a clear yes"),
+    })
+    vi.advanceTimersByTime(10_000)
+    expect(hungUp()).toBe(false)
+    expect(await useTool("confirm_order", { yes: "إيه صحا" })).toEqual({
+      ok: true,
     })
   })
 
