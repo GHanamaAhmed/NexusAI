@@ -137,8 +137,13 @@ export async function connectGeminiLive(options: {
   const live = new GeminiLiveSession()
   const ai = new GoogleGenAI({ apiKey: options.apiKey })
 
+  const model = options.model ?? DEFAULT_MODEL
+  // The extended-thinking model takes asynchronous functions only.
+  const behavior = model.includes("extended-thinking")
+    ? Behavior.NON_BLOCKING
+    : Behavior.BLOCKING
   live.session = await ai.live.connect({
-    model: options.model ?? DEFAULT_MODEL,
+    model,
     config: {
       responseModalities: [Modality.AUDIO],
       systemInstruction: options.instruction,
@@ -158,7 +163,7 @@ export async function connectGeminiLive(options: {
           functionDeclarations: options.tools.map((tool) => ({
             name: tool.name,
             description: tool.description,
-            behavior: Behavior.BLOCKING,
+            behavior,
             ...(tool.parameters
               ? {
                   parameters: {
