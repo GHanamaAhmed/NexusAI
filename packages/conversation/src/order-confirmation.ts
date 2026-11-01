@@ -1,6 +1,7 @@
 import type { ToolDeclaration } from "@nexus/ai"
 import type { Outcome } from "@nexus/core"
 import { darijaAmount } from "./numbers.js"
+import { WILAYAS } from "./wilayas.js"
 
 export type ConfirmationOrder = {
   store: { name: string }
@@ -72,7 +73,7 @@ When to call each function:
 - cancel_order: they don't want it. First ask once if they're sure, and call it only when they say so again.
 - call_later: they can't talk now. Ask when suits them, and pass that time.
 - wrong_number: this isn't ${name}, or they didn't place the order.
-- request_change: they want something changed. Ask what exactly first. For an address, ask for the wilaya, the commune and the address, then say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait. Call it only after they say yes to what you said back. If they say no, ask once more and check again. If it's still not right, don't guess: tell them the shop will call them to take the address, and pass "يحب يبدل العنوان، العنوان الجديد ما تفهمش". Place names are easy to mishear on the phone, so never pass one they haven't confirmed. Write the details in the customer's own words, in Arabic letters for Darija, never translated to English.
+- request_change: they want something changed. Ask what exactly first. For an address, ask for the wilaya, the commune and the address, then say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait. Call it only after they say yes to what you said back. If they say no, ask once more and check again. If it's still not right, don't guess: tell them the shop will call them to take the address, and pass "يحب يبدل العنوان، العنوان الجديد ما تفهمش". Place names are easy to mishear on the phone, so never pass one they haven't confirmed. A wilaya they name is one of these: ${WILAYAS.join("، ")}. Pick the one that sounds closest, and say it back. Write the details in the customer's own words, in Arabic letters for Darija, never translated to English.
 - talk_to_store: they want to speak to someone, or you still can't understand them after asking twice.
 - answering_machine: you hear a voicemail or recorded greeting. Say nothing to it.`
 }

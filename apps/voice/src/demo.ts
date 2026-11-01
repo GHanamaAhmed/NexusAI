@@ -117,6 +117,7 @@ startMediaServer({
     console.log(`${seconds()}s audio connected`)
     const live = await connectGeminiLive({
       apiKey: required("GEMINI_API_KEY"),
+      model: process.env.LIVE_MODEL || undefined,
       voice:
         voice ??
         (language === "fr"

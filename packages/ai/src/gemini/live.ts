@@ -8,7 +8,7 @@ import {
 } from "@google/genai"
 import type { ToolCall, ToolDeclaration, VoiceSession } from "../index.js"
 
-const MODEL = "gemini-3.8-live"
+const DEFAULT_MODEL = "gemini-3.8-live"
 const SILENCE_BEFORE_TURN_ENDS_MS = 600
 
 class GeminiLiveSession implements VoiceSession {
@@ -128,6 +128,7 @@ class GeminiLiveSession implements VoiceSession {
 /** Opens a spoken conversation with Gemini Live. */
 export async function connectGeminiLive(options: {
   apiKey: string
+  model?: string
   voice: string
   instruction: string
   tools: ToolDeclaration[]
@@ -137,7 +138,7 @@ export async function connectGeminiLive(options: {
   const ai = new GoogleGenAI({ apiKey: options.apiKey })
 
   live.session = await ai.live.connect({
-    model: MODEL,
+    model: options.model ?? DEFAULT_MODEL,
     config: {
       responseModalities: [Modality.AUDIO],
       systemInstruction: options.instruction,
