@@ -158,9 +158,10 @@ describe("Call", () => {
     expect(sessions[0]!.heard).toHaveLength(0)
     sessions[0]!.audio(Buffer.alloc(FRAME * 50)) // a 1 s goodbye
     sessions[0]!.turnComplete()
-    vi.advanceTimersByTime(900)
+    // Sent by about 1.1 s; the phone plays it up to a second later.
+    vi.advanceTimersByTime(2_000)
     expect(hungUp()).toBe(false)
-    vi.advanceTimersByTime(1_500)
+    vi.advanceTimersByTime(600)
     expect(hungUp()).toBe(true)
   })
 

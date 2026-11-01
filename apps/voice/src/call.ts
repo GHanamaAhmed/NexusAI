@@ -23,6 +23,11 @@ const ANSWER_PAUSE_MS = 900
 /** The goodbye usually takes a couple of seconds; never wait for more. */
 const GOODBYE_DEADLINE_MS = 8_000
 const GOODBYE_WAIT_MS = 12_000
+/**
+ * The phone plays our audio a little after Asterisk sends it; hanging up as
+ * soon as it's sent cut the end of the goodbye off.
+ */
+const NETWORK_DELAY_MS = 1_000
 /** After the goodbye, the call ends once the customer has been quiet this long. */
 const QUIET_BEFORE_HANGUP_MS = 1_200
 const MAX_WAIT_FOR_QUIET_MS = 3_000
@@ -318,7 +323,11 @@ export class Call {
       void this.hangup()
       return
     }
-    this.media.whenSpeechPlayed(() => this.hangupWhenQuiet())
+    this.media.whenSpeechPlayed(() =>
+      this.timers.push(
+        setTimeout(() => this.hangupWhenQuiet(), NETWORK_DELAY_MS)
+      )
+    )
     this.timers.push(setTimeout(() => void this.hangup(), GOODBYE_WAIT_MS))
   }
 
