@@ -1,2 +1,3 @@
 pnpm-lock.yaml
 deploy/asterisk/conf/
+packages/places/src/data.ts

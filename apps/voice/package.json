@@ -8,6 +8,7 @@
     "test": "vitest run --no-file-parallelism --passWithNoTests"
   },
   "dependencies": {
+    "@google/genai": "^2.32.0",
     "@nexus/ai": "workspace:*",
     "@nexus/conversation": "workspace:*",
     "@nexus/core": "workspace:*",
