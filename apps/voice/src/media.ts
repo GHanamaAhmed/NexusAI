@@ -20,11 +20,12 @@ const MIN_QUEUED_MS = 120
  */
 export class MediaCall {
   onAudio: (pcm: Buffer) => void = () => {}
-  onDrained: () => void = () => {}
   private pending = Buffer.alloc(0)
   private paused = false
   /** When Asterisk will have played everything sent so far. */
   private playedUntil = 0
+  /** When the last speech sent will have been played. */
+  private speechUntil = 0
   private readonly bytesPerMs: number
   private readonly keepAlive: NodeJS.Timeout
   /** Bytes sent to Asterisk: speech from the model, and silence. */
@@ -45,6 +46,9 @@ export class MediaCall {
     const now = Date.now()
     this.playedUntil =
       Math.max(now, this.playedUntil) + chunk.length / this.bytesPerMs
+    if (kind === "speech") {
+      this.speechUntil = this.playedUntil
+    }
     this.socket.send(chunk)
   }
 
@@ -98,9 +102,19 @@ export class MediaCall {
     this.command("FLUSH_MEDIA")
   }
 
-  /** Asks to be told when everything queued has been played. */
-  whenDrained() {
-    this.command("REPORT_QUEUE_DRAINED")
+  /**
+   * Calls back once every word sent so far has been heard. The silence that
+   * keeps the line alive doesn't count.
+   */
+  whenSpeechPlayed(callback: () => void) {
+    const check = () => {
+      if (this.pending.length === 0 && Date.now() >= this.speechUntil) {
+        callback()
+      } else {
+        setTimeout(check, FRAME_MS * 5)
+      }
+    }
+    check()
   }
 
   hangup() {
@@ -120,8 +134,6 @@ export class MediaCall {
     } else if (event.event === "MEDIA_XON") {
       this.paused = false
       this.pump()
-    } else if (event.event === "QUEUE_DRAINED") {
-      this.onDrained()
     }
   }
 }

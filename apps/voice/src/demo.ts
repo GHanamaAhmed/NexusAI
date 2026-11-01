@@ -40,6 +40,7 @@ const ANSWER_PAUSE_MS = 900
 const GOODBYE_DEADLINE_MS = 8_000
 /** After the goodbye, the call ends once the customer has been quiet this long. */
 const QUIET_BEFORE_HANGUP_MS = 1_200
+const MAX_WAIT_FOR_QUIET_MS = 3_000
 const SPEECH_RMS = 700
 
 const task: ConfirmationOrder = {
@@ -85,10 +86,12 @@ async function hangup() {
   await ari.request("DELETE", `/channels/${callChannel}`).catch(() => {})
 }
 
-/** Hangs up once the customer has been quiet for a moment. */
+/** Hangs up once the customer has been quiet for a moment, or soon anyway. */
 function hangupWhenQuiet() {
+  const until = Date.now() + MAX_WAIT_FOR_QUIET_MS
   const check = setInterval(() => {
-    if (Date.now() - lastCustomerVoiceAt >= QUIET_BEFORE_HANGUP_MS) {
+    const quiet = Date.now() - lastCustomerVoiceAt >= QUIET_BEFORE_HANGUP_MS
+    if (quiet || Date.now() >= until) {
       clearInterval(check)
       void hangup()
     }
@@ -105,8 +108,7 @@ function hangupAfterGoodbye() {
     void hangup()
     return
   }
-  media.onDrained = () => hangupWhenQuiet()
-  media.whenDrained()
+  media.whenSpeechPlayed(() => hangupWhenQuiet())
   setTimeout(() => void hangup(), GOODBYE_WAIT_MS)
 }
 

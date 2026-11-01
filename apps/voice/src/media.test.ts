@@ -76,6 +76,16 @@ describe("MediaCall", () => {
     expect(call.sent.silence).toBe(6 * FRAME)
   })
 
+  it("tells when the last words have been heard, ignoring the silence", () => {
+    const heard = vi.fn()
+    call.play(Buffer.alloc(FRAME * 50)) // 1 s
+    call.whenSpeechPlayed(heard)
+    vi.advanceTimersByTime(900)
+    expect(heard).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(300)
+    expect(heard).toHaveBeenCalledOnce()
+  })
+
   it("holds audio while Asterisk's queue is full", () => {
     call.control({ event: "MEDIA_XOFF" })
     call.play(Buffer.alloc(FRAME * 10))
