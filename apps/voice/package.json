@@ -1,0 +1,21 @@
+{
+  "name": "@nexus/voice",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "tsx src/demo.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --no-file-parallelism --passWithNoTests"
+  },
+  "dependencies": {
+    "@nexus/ai": "workspace:*",
+    "@nexus/conversation": "workspace:*",
+    "@nexus/core": "workspace:*",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15"
+  }
+}

@@ -21,6 +21,7 @@ export function taskInputSchema(allowHttpCallbacks: boolean) {
       store: z.object({ name: z.string().min(1).max(80) }).strict(),
       customer: z
         .object({
+          name: z.string().min(1).max(80),
           phone: z
             .string()
             .refine(isAlgerianMobile, "not an Algerian mobile in +213 form"),

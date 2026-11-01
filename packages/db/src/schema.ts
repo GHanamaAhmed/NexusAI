@@ -24,7 +24,7 @@ export type DeliveryEvent = "task.attempted" | "task.completed"
 /** What a task needs to say and do; the client's system stays the record. */
 export type TaskPayload = {
   store: { name: string }
-  customer: { phone: string; language: TaskLanguage }
+  customer: { name: string; phone: string; language: TaskLanguage }
   order: {
     items: { title: string; quantity: number }[]
     total: number

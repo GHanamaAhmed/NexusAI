@@ -11,7 +11,7 @@ const task = {
   external_id: "order-1",
   reference: "1042",
   store: { name: "Boutique Yasmine" },
-  customer: { phone: "+213551234567", language: "ar" },
+  customer: { name: "Sara B.", phone: "+213551234567", language: "ar" },
   order: {
     items: [{ title: "Chemise", quantity: 2 }],
     total: 6500,
@@ -109,9 +109,12 @@ describe("API", () => {
   it.each([
     [
       "a foreign number",
-      { customer: { phone: "+33612345678", language: "ar" } },
+      { customer: { name: "A", phone: "+33612345678", language: "ar" } },
     ],
-    ["a local number", { customer: { phone: "0551234567", language: "ar" } }],
+    [
+      "a local number",
+      { customer: { name: "A", phone: "0551234567", language: "ar" } },
+    ],
     [
       "an insecure callback",
       {
