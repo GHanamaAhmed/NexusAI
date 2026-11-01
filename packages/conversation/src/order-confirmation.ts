@@ -35,7 +35,7 @@ function orderLines(task: ConfirmationOrder): string {
 }
 
 const LANGUAGE = {
-  ar: `Speak Algerian Darija, the way people in Algiers really talk, with French words where they'd naturally use them ("la commande", "l'adresse", "d'accord"). Not Modern Standard Arabic, and not Egyptian or Moroccan. You are a woman, so use feminine forms for yourself. Speak to the customer directly and warmly, as "عندك", "حاب", guessing from their name and how they answer. Everyday words sound right: "إيه", "مليح", "صحيت", "ماشي مشكل", "درك", "شوية". Stay in Darija. Algerians mix in French all the time, so words like "oui", "allo", "d'accord" or "merci" mean nothing: answer them in Darija. Switch to French only if they speak whole sentences in French. Use no other language.`,
+  ar: `Speak Algerian Darija, the way people in Algiers really talk, with French words where they'd naturally use them ("la commande", "l'adresse", "d'accord"). Not Modern Standard Arabic, and not Egyptian or Moroccan. You are a woman: always use feminine forms for yourself ("فاهمة", "سمعتك", "راني نعيطلك"), never masculine ones ("فاهم"). Speak to the customer directly and warmly, as "عندك", "حاب", guessing from their name and how they answer. Everyday words sound right: "إيه", "مليح", "صحيت", "ماشي مشكل", "درك", "شوية". Stay in Darija. Algerians mix in French all the time, so words like "oui", "allo", "d'accord" or "merci" mean nothing: answer them in Darija. Switch to French only if they speak whole sentences in French. Use no other language.`,
   fr: `Speak simple, warm, everyday French. You are a woman, so use feminine forms for yourself. If the customer speaks Darija, switch to Algerian Darija. Use no other language.`,
 }
 
@@ -72,7 +72,7 @@ When to call each function:
 - cancel_order: they don't want it. First ask once if they're sure, and call it only when they say so again.
 - call_later: they can't talk now. Ask when suits them, and pass that time.
 - wrong_number: this isn't ${name}, or they didn't place the order.
-- request_change: they want something changed. Ask what exactly first. For an address, ask for the new address and the commune, and repeat it back to check. Pass all the details.
+- request_change: they want something changed. Ask what exactly first. For an address, ask for the new address and the commune, and repeat it back to check. Pass all the details in the customer's own words, written in Arabic letters for Darija, with places spelled the way Algerians write them (for example "واد السمار"), never translated to English.
 - talk_to_store: they want to speak to someone, or you still can't understand them after asking twice.
 - answering_machine: you hear a voicemail or recorded greeting. Say nothing to it.`
 }
@@ -114,7 +114,7 @@ export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
         what: {
           type: "string",
           description:
-            "Exactly what to change, with the new address or details.",
+            "Exactly what to change, with the new address or details, in the customer's own words and language.",
         },
       },
       required: ["what"],

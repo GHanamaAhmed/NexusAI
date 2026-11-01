@@ -36,6 +36,7 @@ const MAX_CALL_MS = 150_000
 const AUDIO_RATE = 24_000
 const GOODBYE_WAIT_MS = 12_000
 const ANSWER_PAUSE_MS = 900
+const GOODBYE_DEADLINE_MS = 8_000
 
 const task: ConfirmationOrder = {
   store: { name: "متجر الياسمين" },
@@ -128,6 +129,8 @@ startMediaServer({
       )
       outcome = outcomeForTool(tool.name)
       outcomeArgs = tool.args
+      // The goodbye usually takes a couple of seconds; never wait for more.
+      setTimeout(() => hangupAfterGoodbye(), GOODBYE_DEADLINE_MS)
       return { ok: true }
     })
     live.onTurnComplete(() => {
@@ -148,7 +151,11 @@ startMediaServer({
     }, 5_000)
     call.onAudio = (pcm) => {
       heardBytes += pcm.length
-      live.sendAudio(pcm, AUDIO_RATE)
+      // Once the answer is in, the model only says goodbye; nothing it hears
+      // can start the conversation again.
+      if (!outcome) {
+        live.sendAudio(pcm, AUDIO_RATE)
+      }
     }
     // People say "allo" first; a short pause keeps the greeting from colliding.
     setTimeout(() => live.start(OPENING), ANSWER_PAUSE_MS)
