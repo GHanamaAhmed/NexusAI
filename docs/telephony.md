@@ -44,10 +44,17 @@ Tested on 2026-11-01 with `gemini-3.8-live`, on Mobilis:
   - "call me later";
   - asking again when unsure;
   - falling back to "the shop will call you" without guessing.
-- **Audio:** it stays up through long silences, because silence is sent while the model is quiet. Without it, the provider stopped the audio of some calls after about 30 seconds.
-- **Weak: place names.**
-  - The wilaya is often understood once the list of the 69 wilayas is in the instruction.
-  - Communes and street addresses usually aren't.
-  - Because of this, an address is passed to the client only after the customer confirms it, otherwise the shop is asked to call back.
-- **Not usable as a record: the transcript of what the customer said.** It comes out in other languages and scripts even when the model understood.
+- **Audio:**
+  - It stays up through long silences, because silence is sent while the model is quiet. Without it, the provider stopped the audio of some calls after about 30 seconds.
+  - If the customer's phone sends no audio for 30 seconds, Asterisk ends the call (`rtp_timeout`), with no answer.
+- **Places: the wilaya and the commune only.**
+  - The agent never asks for the street, and never offers pick-up at an office.
+  - It looks up what it heard with `find_place` (`@nexus/places`: the 69 wilayas and 1,541 communes), says the match back, and passes a place only after the customer says yes. A place the lookup didn't offer is dropped.
+  - On the phone, Aoulef and Reggane (Adrar) were found and confirmed. A commune that isn't in the wilaya ended, after two tries, with "the shop will call you" and no place.
+  - The instruction names no place but the order's. With "أولف" as an example, the agent passed Aoulef when it didn't catch the commune.
+  - A "no" alone isn't a cancel: "لا لا" followed by a commune was taken for one. The agent now asks what's wrong.
+- **Timing:** Gemini connects while the phone rings, and the first words come 1.4 to 2.3 seconds after the answer. People often say "allo" over the greeting; the agent then says it again.
+- **Hang-up:** the call waits a second after the goodbye is sent. The phone plays it later, and hanging up at once cut its end off.
+- **Not usable as a record: the transcript of what the customer said.** It comes out in other languages and scripts even when the model understood. Gemini sends it even though the call doesn't ask for it, so it's only printed in the log.
+- **Usage:** Gemini reports after each turn, for that turn alone, and each turn's prompt is the whole conversation so far (2,349, then 2,466, then 2,664 tokens). A call's total is the sum: 20,000 to 32,000 prompt tokens for a call of 40 to 50 seconds. A turn with a function call counts about twice, because the model runs again after the answer.
 - **`gemini-3.8-live-extended-thinking` did worse.** It confirmed an order while the customer was changing the wilaya, and it cost about twice as much.
