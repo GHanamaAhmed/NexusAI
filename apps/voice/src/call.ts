@@ -18,8 +18,14 @@ import type { MediaCall } from "./media.js"
 const AUDIO_RATE = 24_000
 const RING_TIMEOUT_S = 40
 const MAX_CALL_MS = 150_000
-/** People say "allo" first; a short pause keeps the greeting from colliding. */
-const ANSWER_PAUSE_MS = 900
+/**
+ * Most people say "allo" first. Greeting at a fixed moment often collided with
+ * it: the model stopped, and the customer waited several seconds in silence.
+ * The greeting waits for them to finish, or starts if they say nothing.
+ */
+const GREET_AFTER_QUIET_MS = 400
+const GREET_IF_UNHEARD_MS = 2_000
+const GREET_AT_LATEST_MS = 3_000
 /** The goodbye usually takes a couple of seconds; never wait for more. */
 const GOODBYE_DEADLINE_MS = 8_000
 const GOODBYE_WAIT_MS = 12_000
@@ -67,6 +73,7 @@ export class Call {
   private session: Session | null = null
   private media?: MediaCall
   private answeredAt = 0
+  private greeted = false
   private heardAgent = false
   private outcome: Outcome | null = null
   private args: Record<string, unknown> = {}
@@ -211,13 +218,32 @@ export class Call {
       if (rms(pcm) > SPEECH_RMS) {
         this.lastCustomerVoiceAt = Date.now()
       }
-      // Once the answer is in, the model only says goodbye; nothing it hears
-      // can start the conversation again.
-      if (!this.outcome) {
+      // The model hears the customer from the greeting on, so an "allo" can't
+      // cut it off. Once the answer is in, the model only says goodbye;
+      // nothing it hears can start the conversation again.
+      if (this.greeted && !this.outcome) {
         session.sendAudio(pcm, AUDIO_RATE)
       }
     }
-    this.timers.push(setTimeout(() => session.start(OPENING), ANSWER_PAUSE_MS))
+    this.greetWhenReady(session)
+  }
+
+  private greetWhenReady(session: VoiceSession) {
+    const start = Date.now()
+    const check = setInterval(() => {
+      const now = Date.now()
+      const spoke = this.lastCustomerVoiceAt > start
+      const ready = spoke
+        ? now - this.lastCustomerVoiceAt >= GREET_AFTER_QUIET_MS
+        : now - start >= GREET_IF_UNHEARD_MS
+      if (ready || now - start >= GREET_AT_LATEST_MS) {
+        clearInterval(check)
+        this.greeted = true
+        this.log(`(greeting; the customer ${spoke ? "spoke" : "said nothing"})`)
+        session.start(OPENING)
+      }
+    }, 100)
+    this.timers.push(check)
   }
 
   private answerTool(

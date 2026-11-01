@@ -70,6 +70,16 @@ describe("Call", () => {
   }
   const useTool = (name: string, args: Record<string, unknown> = {}) =>
     sessions[0]!.tool({ id: "1", name, args })
+  /** 20 ms of someone speaking. */
+  const voice = () => {
+    const pcm = Buffer.alloc(FRAME)
+    for (let i = 0; i < FRAME; i += 2) {
+      pcm.writeInt16LE(i % 4 ? -3000 : 3000, i)
+    }
+    return pcm
+  }
+  /** Nobody says anything, so the greeting starts. */
+  const greet = () => vi.advanceTimersByTime(2_000)
 
   beforeEach(async () => {
     vi.useFakeTimers()
@@ -122,21 +132,54 @@ describe("Call", () => {
     closers[0]!("idle")
     await answer()
     expect(sessions).toHaveLength(2)
-    vi.advanceTimersByTime(900)
+    greet()
     expect(sessions[1]!.started).toEqual([OPENING])
     expect(hungUp()).toBe(false)
   })
 
-  it("greets 900 ms after the audio opens", async () => {
+  it("greets once the customer's allo is over", async () => {
     await answer()
-    vi.advanceTimersByTime(899)
+    vi.advanceTimersByTime(1_000)
+    media.onAudio(voice())
+    vi.advanceTimersByTime(300)
+    media.onAudio(voice())
+    vi.advanceTimersByTime(300)
     expect(sessions[0]!.started).toEqual([])
-    vi.advanceTimersByTime(1)
+    vi.advanceTimersByTime(200)
     expect(sessions[0]!.started).toEqual([OPENING])
+  })
+
+  it("greets after 2 s when the customer says nothing", async () => {
+    await answer()
+    vi.advanceTimersByTime(1_900)
+    expect(sessions[0]!.started).toEqual([])
+    vi.advanceTimersByTime(100)
+    expect(sessions[0]!.started).toEqual([OPENING])
+  })
+
+  it("greets after 3 s at the latest, while the customer keeps talking", async () => {
+    await answer()
+    for (let elapsed = 100; elapsed < 3_000; elapsed += 100) {
+      vi.advanceTimersByTime(100)
+      media.onAudio(voice())
+    }
+    expect(sessions[0]!.started).toEqual([])
+    vi.advanceTimersByTime(100)
+    expect(sessions[0]!.started).toEqual([OPENING])
+  })
+
+  it("keeps the allo from the model, and passes what follows the greeting", async () => {
+    await answer()
+    media.onAudio(voice())
+    expect(sessions[0]!.heard).toHaveLength(0)
+    greet()
+    media.onAudio(voice())
+    expect(sessions[0]!.heard).toHaveLength(1)
   })
 
   it("answers a lookup without ending the call", async () => {
     await answer()
+    greet()
     expect(
       await useTool("find_place", { wilaya: "ادرار", commune: "اولاف" })
     ).toEqual({
@@ -153,6 +196,7 @@ describe("Call", () => {
 
   it("stops listening after the answer, and hangs up once the goodbye is heard", async () => {
     await answer()
+    greet()
     expect(await useTool("confirm_order")).toEqual({ ok: true })
     media.onAudio(Buffer.alloc(FRAME))
     expect(sessions[0]!.heard).toHaveLength(0)
