@@ -12,7 +12,7 @@ import {
 /**
  * Scripted conversations with the real instruction and functions, the customer
  * played as text, with no phone:
- *   tsx src/dialogue-test.ts
+ *   tsx src/dialogue-test.ts [part of a scenario's name]
  * Checks which functions the agent calls. Each run costs a few cents.
  */
 
@@ -53,20 +53,23 @@ const order: ConfirmationOrder = {
 const lookedUp = ({ calls }: Result) =>
   calls.some((call) => call.name === "find_place")
 
-/** The agent looked the place up and passed Aoulef in Adrar once confirmed. */
-function aoulef(result: Result): string | null {
-  if (!lookedUp(result)) {
-    return "find_place was never called"
+/** The agent looked the place up and passed it once confirmed. */
+const movedTo =
+  (wilayaCode: number, communeFr: string) =>
+  (result: Result): string | null => {
+    if (!lookedUp(result)) {
+      return "find_place was never called"
+    }
+    const { outcome, lookups } = result
+    if (outcome?.name !== "request_change") {
+      return `the outcome was ${outcome?.name ?? "none"}, not request_change`
+    }
+    const place = placeChange(outcome.args, lookups)
+    return place?.wilaya_code === wilayaCode && place.commune_fr === communeFr
+      ? null
+      : `request_change got ${JSON.stringify(outcome.args)}`
   }
-  const { outcome, lookups } = result
-  if (outcome?.name !== "request_change") {
-    return `the outcome was ${outcome?.name ?? "none"}, not request_change`
-  }
-  const place = placeChange(outcome.args, lookups)
-  return place?.wilaya_code === 1 && place.commune_fr === "Aoulef"
-    ? null
-    : `request_change got ${JSON.stringify(outcome.args)}`
-}
+const aoulef = movedTo(1, "Aoulef")
 
 const SCENARIOS: Scenario[] = [
   {
@@ -96,6 +99,11 @@ const SCENARIOS: Scenario[] = [
       "إيه صح",
     ],
     check: aoulef,
+  },
+  {
+    name: "no, then a commune alone",
+    customer: ["إيه أنا", "لا لا، بريكة بريكة", "إيه صح", "إيه"],
+    check: movedTo(60, "Barika"),
   },
   {
     name: "commune not in the wilaya",
@@ -166,8 +174,10 @@ async function run(scenario: Scenario): Promise<Result> {
   })
 }
 
+const only = process.argv[2]
+const scenarios = SCENARIOS.filter(({ name }) => !only || name.includes(only))
 let failed = 0
-for (const scenario of SCENARIOS) {
+for (const scenario of scenarios) {
   console.log(`${scenario.name}:`)
   const problem = scenario.check(await run(scenario))
   console.log(
@@ -177,5 +187,5 @@ for (const scenario of SCENARIOS) {
     failed++
   }
 }
-console.log(`${SCENARIOS.length - failed}/${SCENARIOS.length} passed`)
+console.log(`${scenarios.length - failed}/${scenarios.length} passed`)
 process.exit(failed ? 1 : 0)

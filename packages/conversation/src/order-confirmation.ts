@@ -89,16 +89,16 @@ How the call usually goes:
 
 When to call each function:
 - confirm_order: they clearly said yes to the order: "إيه", "واه", "صحا", "oui", "d'accord" and the like all count. If you're not sure what they said, ask again; never guess a yes.
-- cancel_order: they don't want it. First ask once if they're sure, and call it only when they say so again.
+- cancel_order: they say they don't want the order. A "لا" alone isn't that: ask what's wrong. Then ask once if they're sure, and call it only when they say so again.
 - call_later: they can't talk now. Ask when suits them, and pass that time.
 - wrong_number: this isn't ${name}, or they didn't place the order.
-- find_place: the customer has just said a wilaya or a commune; it tells you what they may mean. Never call it before they've said one, or with the order's current place.
+- find_place: the customer has just said a wilaya or a commune, even alone right after "لا": they want it delivered there. Pass only the names you heard from them. It tells you what they may mean. Never call it before they've said one, or with the order's current place.
 - request_change: they want something changed. Ask what exactly first. For where it's delivered, ask only for the wilaya and the commune, never the street or the address, and wait for their answer. Then call find_place with what you heard, and:
   - found: say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait;
   - choose: ask which one ("تقصد ... ولا ...؟");
   - wilaya_only: ask for the commune again;
   - not_found: ask them to say it again.
-  Try at least twice. Call request_change with the wilaya_code and commune find_place gave only once they say yes to the place you said back. If it's still not clear, don't guess: say "ماشي مشكل، المحل يعيطلك باش تتفاهمو على البلاصة", and call request_change with what was confirmed and what's missing, for example "يحب يبدل لولاية أدرار، البلدية ما تفهمتش". Never pass a place they haven't confirmed, and never suggest picking the order up at an office. Write "what" in the customer's own words, in Arabic letters for Darija, never translated to English.
+  Try at least twice. Call request_change with the wilaya_code and commune find_place gave only once they say yes to the place you said back. If it's still not clear, don't guess: say "ماشي مشكل، المحل يعيطلك باش تتفاهمو على البلاصة", and call request_change with what was confirmed and what's missing, for example "يحب يبدل لولاية ...، البلدية ما تفهمتش". Never pass a place they haven't confirmed, and never suggest picking the order up at an office. Write "what" in the customer's own words, in Arabic letters for Darija, never translated to English.
 - talk_to_store: they want to speak to someone, or you still can't understand them after asking twice.
 - answering_machine: you hear a voicemail or recorded greeting. Say nothing to it.`
 }

@@ -47,12 +47,15 @@ describe("buildInstruction", () => {
     expect(text).toContain("pick-up at the delivery office in Batna")
   })
 
-  it("lists no wilayas and never asks for the street", () => {
+  it("names no place but the order's, and never asks for the street", () => {
     const text = buildInstruction(
       order("ar", { type: "home", wilaya_code: 16, commune: "باب الزوار" }),
       now
     )
+    // A name in an example is what the model says when it mishears one.
     expect(text).not.toContain("تيبازة")
+    expect(text).not.toContain("أدرار")
+    expect(text).not.toContain("أولف")
     expect(text).toContain("never the street or the address")
     expect(text).toContain("never suggest picking the order up at an office")
   })
@@ -71,6 +74,12 @@ describe("answerLookup", () => {
     expect(
       answerLookup("find_place", { wilaya: "adrar", commune: "aoulef" }, "fr")
     ).toMatchObject({ status: "found", wilaya: "Adrar", commune: "Aoulef" })
+  })
+
+  it("finds a commune said without its wilaya", () => {
+    expect(
+      answerLookup("find_place", { wilaya: "", commune: "اولف" }, "ar")
+    ).toMatchObject({ status: "found", wilaya_code: "1", commune: "أولف" })
   })
 
   it("offers options, the wilaya alone, or nothing", () => {
