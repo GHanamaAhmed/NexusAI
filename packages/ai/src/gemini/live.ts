@@ -4,6 +4,7 @@ import {
   type LiveServerMessage,
   Modality,
   type Session,
+  ThinkingLevel,
   Type,
 } from "@google/genai"
 import type { ToolCall, ToolDeclaration, VoiceSession } from "../index.js"
@@ -138,14 +139,17 @@ export async function connectGeminiLive(options: {
   const ai = new GoogleGenAI({ apiKey: options.apiKey })
 
   const model = options.model ?? DEFAULT_MODEL
-  // The extended-thinking model takes asynchronous functions only.
-  const behavior = model.includes("extended-thinking")
-    ? Behavior.NON_BLOCKING
-    : Behavior.BLOCKING
+  // The extended-thinking model takes asynchronous functions only, and needs
+  // to be told how much to think.
+  const thinking = model.includes("extended-thinking")
+  const behavior = thinking ? Behavior.NON_BLOCKING : Behavior.BLOCKING
   live.session = await ai.live.connect({
     model,
     config: {
       responseModalities: [Modality.AUDIO],
+      ...(thinking
+        ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+        : {}),
       systemInstruction: options.instruction,
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: options.voice } },
