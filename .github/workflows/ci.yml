@@ -46,7 +46,7 @@ jobs:
 
       - name: Scripts and workflows
         run: |
-          shellcheck deploy/bin/* deploy/asterisk/entrypoint.sh deploy/asterisk/make-lines \
+          shellcheck deploy/bin/* deploy/asterisk/entrypoint.sh deploy/asterisk/make-lines deploy/asterisk/runtime-packages \
             infra/ansible/roles/users/files/deploy-gate
           docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -no-color
 

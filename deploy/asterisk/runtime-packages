@@ -1,0 +1,59 @@
+#!/bin/sh
+# Prints the Ubuntu packages holding the libraries a staged install links
+# against, one per line, for the final image to install:
+#   runtime-packages /staging
+# Fails if a library is missing or belongs to no package, so none is left out
+# quietly.
+set -eu
+
+staging=${1:?usage: runtime-packages <staging folder>}
+
+# The install's own libraries, such as the bundled pjproject, resolve inside it.
+LD_LIBRARY_PATH=$(find "$staging" -type f -name '*.so*' -exec dirname {} \; | sort -u | tr '\n' ':')
+export LD_LIBRARY_PATH
+
+linked=$(find "$staging" -type f \( -perm -u+x -o -name '*.so*' \) -exec ldd {} + 2>/dev/null || true)
+
+unresolved=$(printf '%s\n' "$linked" | awk '$2 == "=>" && $3 == "not" { print $1 }' | sort -u)
+if [ -n "$unresolved" ]; then
+  printf '%s\n' "$unresolved" | sed 's/^/runtime-packages: not found: /' >&2
+  exit 1
+fi
+
+# The same file under /lib and /usr/lib: dpkg knows it by one of the two.
+twin() {
+  case $1 in
+    /usr/lib/*) echo "${1#/usr}" ;;
+    /lib/*) echo "/usr$1" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+package_of() {
+  real=$(readlink -f "$1")
+  for path in "$1" "$real" "$(twin "$1")" "$(twin "$real")"; do
+    package=$(dpkg -S "$path" 2>/dev/null | head -n 1 | cut -d: -f1 | cut -d, -f1)
+    if [ -n "$package" ]; then
+      echo "$package"
+      return 0
+    fi
+  done
+  echo "missing $1"
+}
+
+owners=$(
+  printf '%s\n' "$linked" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }' | sort -u |
+    while read -r library; do
+      case $library in
+        "$staging"/*) ;;
+        *) package_of "$library" ;;
+      esac
+    done
+)
+
+missing=$(printf '%s\n' "$owners" | sed -n 's/^missing //p')
+if [ -n "$missing" ]; then
+  printf '%s\n' "$missing" | sed 's/^/runtime-packages: no package holds /' >&2
+  exit 1
+fi
+printf '%s\n' "$owners" | sort -u
