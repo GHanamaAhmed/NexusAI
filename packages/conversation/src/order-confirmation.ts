@@ -94,7 +94,7 @@ When to call each function:
 - wrong_number: this isn't ${name}, or they didn't place the order.
 - find_place: the customer has just said a wilaya or a commune, even alone right after "لا": they want it delivered there. Pass only the names you heard from them. It tells you what they may mean. Never call it before they've said one, or with the order's current place.
 - request_change: they want something changed. Ask what exactly first. For where it's delivered, ask only for the wilaya and the commune, never the street or the address, and wait for their answer. Then call find_place with what you heard, and:
-  - found: say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait;
+  - found: say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait. Only a yes ("إيه", "صح", "oui") confirms it; a name, even the same one, isn't a yes: look it up again;
   - choose: ask which one ("تقصد ... ولا ...؟");
   - wilaya_only: ask for the commune again;
   - not_found: ask them to say it again.
@@ -152,6 +152,11 @@ export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
           description:
             "The commune find_place returned, only for a place the customer confirmed.",
         },
+        yes: {
+          type: "string",
+          description:
+            "With a place: the customer's exact words when they said yes to it.",
+        },
       },
       required: ["what"],
     },
@@ -165,7 +170,7 @@ export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
         wilaya: {
           type: "string",
           description:
-            "The wilaya as you heard it, in Arabic letters, or in Latin letters if they spelled it the French way. Empty if they didn't say one.",
+            "The wilaya as you heard it, in Arabic letters, or in Latin letters if they spelled it the French way. Empty if they didn't say one; never the order's own.",
         },
         commune: {
           type: "string",
@@ -261,9 +266,33 @@ function offered(lookups: readonly Record<string, unknown>[]): Offer[] {
   )
 }
 
+const wordSet = (words: string) => new Set(words.split(" "))
+const YES = wordSet(
+  "ايه اه اي يه واه وه صح صحيح صحا نعم ايوا ايوه هيه مليح oui ouais wah ih yes exact exactement voila accord"
+)
+const NO = wordSet("لا لالا ماشي مش ميش ماهيش ماهوش غلط non no machi")
+
+/**
+ * Whether words the agent heard say yes, with nothing against it. A name said
+ * again isn't a yes: on the phone, the agent took one for a confirmation.
+ */
+export function saidYes(words: string): boolean {
+  const tokens = words
+    .toLowerCase()
+    .normalize("NFD")
+    // Accents, Arabic vowel marks and hamzas, and tatweel: "إيه" is "ايه".
+    .replace(/[\u0300-\u036f\u064b-\u065f\u0670\u0640]/g, "")
+    .split(/[^\p{L}]+/u)
+  return (
+    tokens.some((token) => YES.has(token)) &&
+    !tokens.some((token) => NO.has(token))
+  )
+}
+
 /**
  * The new place from request_change's arguments: a real commune of that
- * wilaya, and one find_place offered during the call, so never a guess.
+ * wilaya, one find_place offered during the call, and one the customer said
+ * yes to, so never a guess.
  */
 export function placeChange(
   args: Record<string, unknown>,
@@ -280,11 +309,25 @@ export function placeChange(
         Number(offer.wilaya_code) === commune.wilaya &&
         (offer.commune === commune.ar || offer.commune === commune.fr)
     )
-  return commune && wasOffered
+  return commune && wasOffered && saidYes(text(args.yes))
     ? {
         wilaya_code: commune.wilaya,
         commune_ar: commune.ar,
         commune_fr: commune.fr,
       }
+    : null
+}
+
+/**
+ * Why request_change can't be taken as it is, to tell the agent so the call
+ * goes on, or null when it can.
+ */
+export function refuseChange(
+  args: Record<string, unknown>,
+  lookups: readonly Record<string, unknown>[]
+): string | null {
+  const namesPlace = text(args.wilaya_code) !== "" || text(args.commune) !== ""
+  return namesPlace && !placeChange(args, lookups)
+    ? "Not passed: the customer hasn't said yes to a place find_place gave. Say it back and wait for a yes, or say the store will call and pass no place."
     : null
 }

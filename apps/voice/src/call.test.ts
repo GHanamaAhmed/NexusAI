@@ -224,6 +224,7 @@ describe("Call", () => {
       what: "بلدية أولف",
       wilaya_code: "1",
       commune: "أولف",
+      yes: "إيه صح",
     })
     await hangUpNormally()
     expect(await call.done).toMatchObject({
@@ -233,18 +234,43 @@ describe("Call", () => {
     })
   })
 
-  it("ignores a place the lookup never offered", async () => {
+  it("sends back a place the customer didn't say yes to, and goes on", async () => {
     await answer()
-    await useTool("request_change", {
-      what: "بلدية أولف",
-      wilaya_code: "1",
-      commune: "أولف",
-    })
+    greet()
+    await useTool("find_place", { wilaya: "الجزائر", commune: "الشراقة" })
+    expect(
+      await useTool("request_change", {
+        what: "ولاية الجزائر، بلدية الشراقة",
+        wilaya_code: "16",
+        commune: "الشراقة",
+        yes: "أدرار رقان",
+      })
+    ).toMatchObject({ error: expect.stringContaining("hasn't said yes") })
+    media.onAudio(voice())
+    expect(sessions[0]!.heard).toHaveLength(1)
+    vi.advanceTimersByTime(10_000)
+    expect(hungUp()).toBe(false)
+    await useTool("request_change", { what: "يحب يبدل، البلاصة ما تفهمتش" })
     await hangUpNormally()
     expect(await call.done).toMatchObject({
       outcome: "request_change",
+      args: { what: "يحب يبدل، البلاصة ما تفهمتش" },
       change: null,
     })
+  })
+
+  it("sends back a place the lookup never offered", async () => {
+    await answer()
+    expect(
+      await useTool("request_change", {
+        what: "بلدية أولف",
+        wilaya_code: "1",
+        commune: "أولف",
+        yes: "إيه",
+      })
+    ).toMatchObject({ error: expect.any(String) })
+    await hangUpNormally()
+    expect(await call.done).toMatchObject({ outcome: null, change: null })
   })
 
   it("keeps the first answer when the model calls a second one", async () => {

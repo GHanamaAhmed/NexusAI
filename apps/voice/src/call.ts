@@ -9,6 +9,7 @@ import {
   outcomeForTool,
   type PlaceChange,
   placeChange,
+  refuseChange,
 } from "@nexus/conversation"
 import type { Outcome } from "@nexus/core"
 import type { Ari, AriEvent } from "./ari.js"
@@ -266,6 +267,12 @@ export class Call {
     if (this.outcome) {
       this.log(`(ignored ${name}: the outcome is already ${this.outcome})`)
       return { ok: true }
+    }
+    const refusal =
+      name === "request_change" ? refuseChange(args, this.lookups) : null
+    if (refusal) {
+      this.log(`(refused ${name}: no yes to a place the lookup gave)`)
+      return { error: refusal }
     }
     this.outcome = outcome
     this.args = args

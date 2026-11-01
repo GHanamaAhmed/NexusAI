@@ -4,6 +4,8 @@ import {
   buildInstruction,
   type ConfirmationOrder,
   placeChange,
+  refuseChange,
+  saidYes,
 } from "./order-confirmation.js"
 
 const order = (
@@ -116,7 +118,7 @@ describe("placeChange", () => {
   it("returns a commune the lookup offered", () => {
     expect(
       placeChange(
-        { what: "بلدية أولف", wilaya_code: "1", commune: "أولف" },
+        { what: "بلدية أولف", wilaya_code: "1", commune: "أولف", yes: "إيه" },
         aoulef
       )
     ).toEqual({ wilaya_code: 1, commune_ar: "أولف", commune_fr: "Aoulef" })
@@ -128,15 +130,30 @@ describe("placeChange", () => {
       )!,
     ]
     expect(
-      placeChange({ wilaya_code: "16", commune: "Tessala El Merdja" }, choices)
+      placeChange(
+        { wilaya_code: "16", commune: "Tessala El Merdja", yes: "oui" },
+        choices
+      )
     ).toMatchObject({ commune_ar: "تسالة المرجة" })
   })
 
   it("refuses a real commune the lookup never offered", () => {
-    expect(placeChange({ wilaya_code: "1", commune: "أولف" }, [])).toBeNull()
     expect(
-      placeChange({ wilaya_code: "16", commune: "باب الزوار" }, aoulef)
+      placeChange({ wilaya_code: "1", commune: "أولف", yes: "إيه" }, [])
     ).toBeNull()
+    expect(
+      placeChange(
+        { wilaya_code: "16", commune: "باب الزوار", yes: "إيه" },
+        aoulef
+      )
+    ).toBeNull()
+  })
+
+  it("refuses a place the customer didn't say yes to", () => {
+    const place = { wilaya_code: "1", commune: "أولف" }
+    expect(placeChange(place, aoulef)).toBeNull()
+    expect(placeChange({ ...place, yes: "أولف" }, aoulef)).toBeNull()
+    expect(placeChange({ ...place, yes: "لا، أدرار رقان" }, aoulef)).toBeNull()
   })
 
   it("refuses a commune of another wilaya, or a missing one", () => {
@@ -148,5 +165,44 @@ describe("placeChange", () => {
     ).toBeNull()
     expect(placeChange({ wilaya_code: "1" }, aoulef)).toBeNull()
     expect(placeChange({ what: "يحب يبدل لولاية أدرار" }, aoulef)).toBeNull()
+  })
+})
+
+describe("saidYes", () => {
+  it.each(["إيه", "إيه صح", "آه", "صحا", "واه", "Oui.", "ouais", "d'accord"])(
+    "hears a yes in %s",
+    (words) => expect(saidYes(words)).toBe(true)
+  )
+
+  it.each([
+    "لا",
+    "لا، أدرار رقان",
+    "الشرقان",
+    "أدرار رقان",
+    "non",
+    "إيه، ماشي هذي",
+    "",
+  ])("hears no yes in %s", (words) => expect(saidYes(words)).toBe(false))
+})
+
+describe("refuseChange", () => {
+  const aoulef = [
+    answerLookup("find_place", { wilaya: "ادرار", commune: "اولاف" }, "ar")!,
+  ]
+
+  it("takes a change without a place, or a confirmed one", () => {
+    expect(refuseChange({ what: "بدل البلدية، ما تفهمتش" }, [])).toBeNull()
+    expect(
+      refuseChange(
+        { what: "x", wilaya_code: "1", commune: "أولف", yes: "إيه" },
+        aoulef
+      )
+    ).toBeNull()
+  })
+
+  it("tells the agent why a place can't pass", () => {
+    expect(
+      refuseChange({ what: "x", wilaya_code: "1", commune: "أولف" }, aoulef)
+    ).toContain("hasn't said yes")
   })
 })

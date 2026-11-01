@@ -7,6 +7,7 @@ import {
   OPENING,
   outcomeForTool,
   placeChange,
+  refuseChange,
 } from "@nexus/conversation"
 
 /**
@@ -106,6 +107,19 @@ const SCENARIOS: Scenario[] = [
     check: movedTo(60, "Barika"),
   },
   {
+    name: "another place instead of a yes",
+    customer: ["إيه أنا", "لا، بلدية الشرقان", "أدرار، رقان", "إيه صح", "إيه"],
+    check: ({ outcome, lookups }) => {
+      const place = outcome ? placeChange(outcome.args, lookups) : null
+      if (outcome?.name !== "request_change") {
+        return `the outcome was ${outcome?.name ?? "none"}, not request_change`
+      }
+      return place === null || place.commune_fr === "Reggane"
+        ? null
+        : `passed ${JSON.stringify(place)}`
+    },
+  },
+  {
     name: "commune not in the wilaya",
     customer: [
       "إيه أنا",
@@ -153,6 +167,14 @@ async function run(scenario: Scenario): Promise<Result> {
         console.log(`  lookup: ${JSON.stringify(lookup)}`)
         result.lookups.push(lookup)
         return lookup
+      }
+      const refusal =
+        name === "request_change" && !result.outcome
+          ? refuseChange(args, result.lookups)
+          : null
+      if (refusal) {
+        console.log(`  (refused: ${refusal})`)
+        return { error: refusal }
       }
       if (outcomeForTool(name) && !result.outcome) {
         result.outcome = { name, args }
