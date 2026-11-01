@@ -154,7 +154,8 @@ export async function connectGeminiLive(options: {
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: options.voice } },
       },
-      inputAudioTranscription: {},
+      // The customer isn't transcribed: on phone audio the text came out in
+      // other languages, and the model hears the audio either way.
       outputAudioTranscription: {},
       realtimeInputConfig: {
         automaticActivityDetection: {

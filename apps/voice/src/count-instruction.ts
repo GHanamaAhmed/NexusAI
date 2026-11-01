@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai"
-import { buildInstruction, WILAYAS } from "@nexus/conversation"
+import { buildInstruction } from "@nexus/conversation"
 
-/** Counts the call instruction's tokens, with and without the wilaya list. */
+/** Counts the call instruction's tokens, which every turn of a call bills again. */
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 const instruction = buildInstruction(
   {
@@ -18,12 +18,8 @@ const instruction = buildInstruction(
   },
   new Date()
 )
-const count = async (text: string) =>
-  (
-    await ai.models.countTokens({
-      model: "gemini-3.8-flash",
-      contents: [{ role: "user", parts: [{ text }] }],
-    })
-  ).totalTokens
-console.log(`instruction: ${await count(instruction)} tokens`)
-console.log(`wilaya list alone: ${await count(WILAYAS.join("، "))} tokens`)
+const { totalTokens } = await ai.models.countTokens({
+  model: "gemini-3.8-flash",
+  contents: [{ role: "user", parts: [{ text: instruction }] }],
+})
+console.log(`instruction: ${totalTokens} tokens`)

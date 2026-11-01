@@ -1,8 +1,12 @@
 import type { ToolDeclaration } from "@nexus/ai"
 import type { Outcome } from "@nexus/core"
-import { resolveCommune, wilayaByCode } from "@nexus/places"
+import {
+  findPlace,
+  type Place,
+  resolveCommune,
+  wilayaByCode,
+} from "@nexus/places"
 import { darijaAmount } from "./numbers.js"
-import { WILAYAS } from "./wilayas.js"
 
 type Language = "ar" | "fr"
 type Delivery = {
@@ -72,7 +76,7 @@ ${orderLines(task)}
 
 This has to sound like an ordinary phone call from someone at the shop. Speak casually and briefly, the way people do on the phone. Listen, react to what they just said, then go on.
 - Never open with an introduction such as "I'm the assistant of...". Never sound like an announcement, a script or a form.
-- Never use office words such as "registered", "recorded", "your request" ("تسجيل", "سجلنا", "طلب التغيير"), and never thank them for a change. Say simply what will happen, for example "مليح، نقولو للمحل يبدلولك العنوان".
+- Never use office words such as "registered", "recorded", "your request" ("تسجيل", "سجلنا", "طلب التغيير"), and never thank them for a change. Say simply what will happen, for example "مليح، نقولو للمحل يبدلولك البلاصة".
 - Say one short thing, then let them answer. Don't say the whole order in one long sentence if you can split it.
 - Never invent prices, delivery dates or stock. If they ask something you can't answer, say the shop will call them.
 - If they ask whether you're a person or a machine, tell the truth: you're the shop's automated assistant. Never claim to be human.
@@ -81,14 +85,20 @@ How the call usually goes:
 1. Your first words are exactly "${GREETING[language](name)}", and nothing else. Then wait for them to answer. If they say nothing, wait; then say only "ألو؟", never the whole greeting again.
 2. When they say it's them, tell them they have an order from ${task.store.name}: what it is, the total and where it's going. For example "عندك كوموند من عند ${task.store.name}...". Then ask if it's good to send.
 3. Talk it through. If something is unclear, ask again in other words.
-4. Only when everything is settled and they've answered your last question, call one function. Never call a function while you're still asking or checking something. After the function, say a short goodbye ("يعطيك الصحة، بالسلامة") and stop.
+4. Only when everything is settled and they've answered your last question, call the function that fits. Never call one while you're still asking or checking something; find_place is the only exception. After the function, say a short goodbye ("يعطيك الصحة، بالسلامة") and stop.
 
 When to call each function:
 - confirm_order: they clearly said yes to the order: "إيه", "واه", "صحا", "oui", "d'accord" and the like all count. If you're not sure what they said, ask again; never guess a yes.
 - cancel_order: they don't want it. First ask once if they're sure, and call it only when they say so again.
 - call_later: they can't talk now. Ask when suits them, and pass that time.
 - wrong_number: this isn't ${name}, or they didn't place the order.
-- request_change: they want something changed. Ask what exactly first. For an address, ask for the wilaya, the commune and the address, then say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait. Call it only after they say yes to what you said back. If they say no or you didn't catch part of it, ask again for that part (at least twice) and check again. If it's still not clear, don't guess: say clearly "ماشي مشكل، المحل يعيطلك باش ياخد العنوان", and pass what was confirmed plus what's missing, for example "يحب يبدل العنوان لولاية أدرار، البلدية والعنوان ما تفهموش". Place names are easy to mishear on the phone, so never pass one they haven't confirmed. A wilaya they name is one of these: ${WILAYAS.join("، ")}. Pick the one that sounds closest, and say it back. Write the details in the customer's own words, in Arabic letters for Darija, never translated to English.
+- find_place: the customer has just said a wilaya or a commune; it tells you what they may mean. Never call it before they've said one, or with the order's current place.
+- request_change: they want something changed. Ask what exactly first. For where it's delivered, ask only for the wilaya and the commune, never the street or the address, and wait for their answer. Then call find_place with what you heard, and:
+  - found: say it back ("يعني ولاية ...، بلدية ...، صح؟") and wait;
+  - choose: ask which one ("تقصد ... ولا ...؟");
+  - wilaya_only: ask for the commune again;
+  - not_found: ask them to say it again.
+  Try at least twice. Call request_change with the wilaya_code and commune find_place gave only once they say yes to the place you said back. If it's still not clear, don't guess: say "ماشي مشكل، المحل يعيطلك باش تتفاهمو على البلاصة", and call request_change with what was confirmed and what's missing, for example "يحب يبدل لولاية أدرار، البلدية ما تفهمتش". Never pass a place they haven't confirmed, and never suggest picking the order up at an office. Write "what" in the customer's own words, in Arabic letters for Darija, never translated to English.
 - talk_to_store: they want to speak to someone, or you still can't understand them after asking twice.
 - answering_machine: you hear a voicemail or recorded greeting. Say nothing to it.`
 }
@@ -130,10 +140,39 @@ export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
         what: {
           type: "string",
           description:
-            "Exactly what to change, with the new address or details, in the customer's own words and language.",
+            "Exactly what to change, in the customer's own words and language.",
+        },
+        wilaya_code: {
+          type: "string",
+          description:
+            "The wilaya_code find_place returned, only for a place the customer confirmed.",
+        },
+        commune: {
+          type: "string",
+          description:
+            "The commune find_place returned, only for a place the customer confirmed.",
         },
       },
       required: ["what"],
+    },
+  },
+  {
+    name: "find_place",
+    description:
+      "Looks up the wilaya and commune the customer just said, as you heard them. Returns the places they may mean. Only call it after they've said one.",
+    parameters: {
+      properties: {
+        wilaya: {
+          type: "string",
+          description:
+            "The wilaya as you heard it, in Arabic letters, or in Latin letters if they spelled it the French way. Empty if they didn't say one.",
+        },
+        commune: {
+          type: "string",
+          description:
+            "The commune as you heard it, written the same way. Empty if they didn't say one.",
+        },
+      },
     },
   },
   {
@@ -163,4 +202,89 @@ const TOOL_OUTCOMES: Record<string, Outcome> = {
 
 export function outcomeForTool(name: string): Outcome | null {
   return TOOL_OUTCOMES[name] ?? null
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+/** Answers a lookup made mid-call; null when the function isn't one (outcome functions aren't). */
+export function answerLookup(
+  name: string,
+  args: Record<string, unknown>,
+  language: Language
+): Record<string, unknown> | null {
+  if (name !== "find_place") {
+    return null
+  }
+  // Codes go back as text, like every value the model passes.
+  const describe = ({ wilaya, commune }: Place) => ({
+    wilaya_code: String(wilaya.code),
+    wilaya: wilaya[language],
+    commune: commune?.[language] ?? null,
+  })
+  const result = findPlace({
+    wilaya: text(args.wilaya),
+    commune: text(args.commune),
+  })
+  switch (result.status) {
+    case "found":
+      return { status: "found", ...describe(result.place) }
+    case "choose":
+      return { status: "choose", options: result.options.map(describe) }
+    case "wilaya_only":
+      return {
+        status: "wilaya_only",
+        ...describe({ wilaya: result.wilaya, commune: null }),
+      }
+    case "not_found":
+      return { status: "not_found" }
+  }
+}
+
+export type PlaceChange = {
+  wilaya_code: number
+  commune_ar: string
+  commune_fr: string
+}
+
+type Offer = { wilaya_code: string; commune: string | null }
+
+/** The places the call's lookups offered the agent to say back. */
+function offered(lookups: readonly Record<string, unknown>[]): Offer[] {
+  return lookups.flatMap((lookup) =>
+    lookup.status === "found"
+      ? [lookup as Offer]
+      : lookup.status === "choose"
+        ? (lookup.options as Offer[])
+        : []
+  )
+}
+
+/**
+ * The new place from request_change's arguments: a real commune of that
+ * wilaya, and one find_place offered during the call, so never a guess.
+ */
+export function placeChange(
+  args: Record<string, unknown>,
+  lookups: readonly Record<string, unknown>[]
+): PlaceChange | null {
+  const code = Number(text(args.wilaya_code))
+  const commune = Number.isInteger(code)
+    ? resolveCommune(code, text(args.commune))
+    : undefined
+  const wasOffered =
+    commune !== undefined &&
+    offered(lookups).some(
+      (offer) =>
+        Number(offer.wilaya_code) === commune.wilaya &&
+        (offer.commune === commune.ar || offer.commune === commune.fr)
+    )
+  return commune && wasOffered
+    ? {
+        wilaya_code: commune.wilaya,
+        commune_ar: commune.ar,
+        commune_fr: commune.fr,
+      }
+    : null
 }
