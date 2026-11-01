@@ -125,8 +125,13 @@ startMediaServer({
           : (process.env.VOICE_AR ?? "Aoede")),
       instruction: buildInstruction(task, new Date()),
       tools: CONFIRMATION_TOOLS,
-      onClose: (reason) =>
-        console.log(`${seconds()}s Gemini closed: ${reason}`),
+      onClose: (reason) => {
+        console.log(`${seconds()}s Gemini closed: ${reason}`)
+        // Never leave the customer on a silent line.
+        if (!outcome) {
+          void hangup()
+        }
+      },
     })
     session = live
     live.onInterrupted(() => {
