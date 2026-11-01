@@ -142,7 +142,9 @@ startMediaServer({
       call.play(pcm)
     })
     setInterval(() => {
-      console.log(`${seconds()}s audio in ${heardBytes}, out ${saidBytes}`)
+      console.log(
+        `${seconds()}s audio in ${heardBytes}, model ${saidBytes}, sent speech ${call.sent.speech} silence ${call.sent.silence}`
+      )
     }, 5_000)
     call.onAudio = (pcm) => {
       heardBytes += pcm.length

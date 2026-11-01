@@ -29,4 +29,4 @@ Two Algerian mobile networks behaved the same way, so the limit is in the provid
 
 ## Voices
 
-Chosen by listening on a real call: `Charon` for Darija, `Kore` for French (`VOICE_AR`, `VOICE_FR`). Totals are said in words ("ستة آلاف و خمسمية دينار"), not digits or centimes.
+Chosen by listening on real calls: `Aoede` for Darija (a woman's voice, preferred over `Charon` on spoken calls on 2026-11-01), `Kore` for French (`VOICE_AR`, `VOICE_FR`). Totals are said in words ("ستة آلاف و خمسمية دينار"), not digits or centimes.

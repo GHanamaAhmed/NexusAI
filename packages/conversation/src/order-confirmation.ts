@@ -1,5 +1,6 @@
 import type { ToolDeclaration } from "@nexus/ai"
 import type { Outcome } from "@nexus/core"
+import { darijaAmount } from "./numbers.js"
 
 export type ConfirmationOrder = {
   store: { name: string }
@@ -17,6 +18,10 @@ export type ConfirmationOrder = {
 
 function orderLines(task: ConfirmationOrder): string {
   const { items, total, delivery } = task.order
+  const spoken =
+    task.customer.language === "ar"
+      ? `Say the total exactly as "${darijaAmount(total)}". Never in centimes, and never another number.`
+      : `Say the total as ${total} dinars, in words. Never in centimes.`
   const lines = items.map((item) => `- ${item.quantity} × ${item.title}`)
   const where =
     delivery.type === "home"
@@ -24,7 +29,7 @@ function orderLines(task: ConfirmationOrder): string {
       : `pick-up at the delivery office in ${delivery.region}`
   return [
     ...lines,
-    `Total, delivery included: ${total} dinars. Say it in words.`,
+    `Total, delivery included: ${total} dinars. ${spoken}`,
     `Delivery: ${where}.`,
   ].join("\n")
 }
@@ -57,7 +62,7 @@ This has to sound like an ordinary phone call from someone at the shop. Speak ca
 - If they ask whether you're a person or a machine, tell the truth: you're the shop's automated assistant. Never claim to be human.
 
 How the call usually goes:
-1. Your first words are exactly "${GREETING[language](name)}", and nothing else. Then wait for them to answer.
+1. Your first words are exactly "${GREETING[language](name)}", and nothing else. Then wait for them to answer. If they say nothing, wait; then say only "ألو؟", never the whole greeting again.
 2. When they say it's them, tell them they have an order from ${task.store.name}: what it is, the total and where it's going. For example "عندك كوموند من عند ${task.store.name}...". Then ask if it's good to send.
 3. Talk it through. If something is unclear, ask again in other words.
 4. When it's settled, call one function. Then say a short goodbye ("يعطيك الصحة، بالسلامة") and stop.
