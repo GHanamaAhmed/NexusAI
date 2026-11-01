@@ -49,12 +49,23 @@ Tested on 2026-11-01 with `gemini-3.8-live`, on Mobilis:
   - If the customer's phone sends no audio for 30 seconds, Asterisk ends the call (`rtp_timeout`), with no answer.
 - **Places: the wilaya and the commune only.**
   - The agent never asks for the street, and never offers pick-up at an office.
-  - It looks up what it heard with `find_place` (`@nexus/places`: the 69 wilayas and 1,541 communes), says the match back, and passes a place only after the customer says yes. A place the lookup didn't offer is dropped.
-  - On the phone, Aoulef and Reggane (Adrar) were found and confirmed. A commune that isn't in the wilaya ended, after two tries, with "the shop will call you" and no place.
+  - It looks up what it heard with `find_place` (`@nexus/places`: the 69 wilayas and 1,541 communes), says the match back, and passes a place only after the customer says yes.
+  - On the phone, Aoulef and Reggane (Adrar) and Béchar were found and confirmed. A commune that isn't in the wilaya ended, after two tries, with "the shop will call you" and no place.
+  - A TV beside the phone was enough for the agent to miss "Béchar" entirely.
   - The instruction names no place but the order's. With "أولف" as an example, the agent passed Aoulef when it didn't catch the commune.
   - A "no" alone isn't a cancel: "لا لا" followed by a commune was taken for one. The agent now asks what's wrong.
-- **Timing:** Gemini connects while the phone rings, and the first words come 1.4 to 2.3 seconds after the answer. People often say "allo" over the greeting; the agent then says it again.
+- **What the code checks, because the instruction alone didn't hold:**
+  - A confirmation, and a new place, carry the customer's words of agreement. They must hold a yes ("إيه", "صحا", "بعثوها", "oui"...) and no "لا". Otherwise the agent is told so and the call goes on. The agent once took a name said again for a yes, and in the dialogue test it called `confirm_order` before saying a word, with its own greeting as the answer (4 conversations in 24).
+  - A new place must be one a lookup offered.
+  - No confirmation once a lookup has offered another place: the agent confirmed an order, on a reply it misheard, while the customer was changing the place.
+  - A lookup of the order's own place says so instead of offering it back. Said back, it sounded like a question about the order.
+  - The first outcome stands; a later one is ignored.
+- **Timing:**
+  - Gemini connects while the phone rings.
+  - Most people say "allo" first. Greeting at a fixed moment, 1.4 to 2.3 seconds after the answer, collided with it in 3 calls out of 7: the model stopped, and the customer waited 6 to 9 seconds in silence.
+  - The greeting now waits until the customer has been quiet for 400 ms after speaking, or 2 seconds if they say nothing, and 3 at most. The model hears the customer only from the greeting on. The first words come about 3 seconds after the answer, and the greeting plays whole.
 - **Hang-up:** the call waits a second after the goodbye is sent. The phone plays it later, and hanging up at once cut its end off.
 - **Not usable as a record: the transcript of what the customer said.** It comes out in other languages and scripts even when the model understood. Gemini sends it even though the call doesn't ask for it, so it's only printed in the log.
 - **Usage:** Gemini reports after each turn, for that turn alone, and each turn's prompt is the whole conversation so far (2,349, then 2,466, then 2,664 tokens). A call's total is the sum: 20,000 to 32,000 prompt tokens for a call of 40 to 50 seconds. A turn with a function call counts about twice, because the model runs again after the answer.
+- **Once, the model's reasoning came out as speech.** In 1 dialogue-test conversation out of 12, the agent's transcript started with English reasoning ("Analyze the user's input..."). It wasn't seen on the phone calls.
 - **`gemini-3.8-live-extended-thinking` did worse.** It confirmed an order while the customer was changing the wilaya, and it cost about twice as much.
