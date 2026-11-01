@@ -9,6 +9,7 @@ import {
 } from "@nexus/conversation"
 import { isAlgerianMobile, toDialString } from "@nexus/core"
 import { Ari, type AriEvent } from "./ari.js"
+import { medianPitch, rms } from "./audio.js"
 import { type MediaCall, startMediaServer } from "./media.js"
 
 /**
@@ -37,6 +38,9 @@ const AUDIO_RATE = 24_000
 const GOODBYE_WAIT_MS = 12_000
 const ANSWER_PAUSE_MS = 900
 const GOODBYE_DEADLINE_MS = 8_000
+/** After the goodbye, the call ends once the customer has been quiet this long. */
+const QUIET_BEFORE_HANGUP_MS = 1_200
+const SPEECH_RMS = 700
 
 const task: ConfirmationOrder = {
   store: { name: "متجر الياسمين" },
@@ -64,6 +68,8 @@ let media: MediaCall | undefined
 let outcome: string | null = null
 let outcomeArgs: Record<string, unknown> = {}
 let hangingUp = false
+let lastCustomerVoiceAt = 0
+let agentTurnAudio: Buffer[] = []
 let promptTokens = 0
 let responseTokens = 0
 
@@ -79,7 +85,17 @@ async function hangup() {
   await ari.request("DELETE", `/channels/${callChannel}`).catch(() => {})
 }
 
-/** Lets the goodbye play to the end, then hangs up. */
+/** Hangs up once the customer has been quiet for a moment. */
+function hangupWhenQuiet() {
+  const check = setInterval(() => {
+    if (Date.now() - lastCustomerVoiceAt >= QUIET_BEFORE_HANGUP_MS) {
+      clearInterval(check)
+      void hangup()
+    }
+  }, 200)
+}
+
+/** Lets the goodbye play to the end, then hangs up when the customer is quiet. */
 function hangupAfterGoodbye() {
   if (hangingUp) {
     return
@@ -89,7 +105,7 @@ function hangupAfterGoodbye() {
     void hangup()
     return
   }
-  media.onDrained = () => void hangup()
+  media.onDrained = () => hangupWhenQuiet()
   media.whenDrained()
   setTimeout(() => void hangup(), GOODBYE_WAIT_MS)
 }
@@ -134,6 +150,11 @@ startMediaServer({
       return { ok: true }
     })
     live.onTurnComplete(() => {
+      const pitch = medianPitch(Buffer.concat(agentTurnAudio), AUDIO_RATE)
+      agentTurnAudio = []
+      if (pitch) {
+        console.log(`${seconds()}s (agent voice pitch ${pitch} Hz)`)
+      }
       if (outcome) {
         hangupAfterGoodbye()
       }
@@ -142,6 +163,7 @@ startMediaServer({
     let saidBytes = 0
     live.onAudio((pcm) => {
       saidBytes += pcm.length
+      agentTurnAudio.push(pcm)
       call.play(pcm)
     })
     setInterval(() => {
@@ -151,6 +173,9 @@ startMediaServer({
     }, 5_000)
     call.onAudio = (pcm) => {
       heardBytes += pcm.length
+      if (rms(pcm) > SPEECH_RMS) {
+        lastCustomerVoiceAt = Date.now()
+      }
       // Once the answer is in, the model only says goodbye; nothing it hears
       // can start the conversation again.
       if (!outcome) {
