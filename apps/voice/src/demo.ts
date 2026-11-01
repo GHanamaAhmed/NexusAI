@@ -124,7 +124,7 @@ startMediaServer({
         voice ??
         (language === "fr"
           ? (process.env.VOICE_FR ?? "Kore")
-          : (process.env.VOICE_AR ?? "Aoede")),
+          : (process.env.VOICE_AR ?? "Callirrhoe")),
       instruction: buildInstruction(task, new Date()),
       tools: CONFIRMATION_TOOLS,
       onClose: (reason) => {
