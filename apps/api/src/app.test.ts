@@ -16,7 +16,7 @@ const task = {
     items: [{ title: "Chemise", quantity: 2 }],
     total: 6500,
     currency: "DZD",
-    delivery: { type: "home", region: "Alger", city: "Bab Ezzouar" },
+    delivery: { type: "home", wilaya_code: 16, commune: "باب الزوار" },
   },
   callbacks: {
     outcome_url: "https://client.example.com/outcome",
@@ -125,6 +125,33 @@ describe("API", () => {
       },
     ],
     ["an unknown field", { extra: true }],
+    [
+      "wilaya 0",
+      {
+        order: {
+          ...task.order,
+          delivery: { type: "home", wilaya_code: 0, commune: null },
+        },
+      },
+    ],
+    [
+      "wilaya 70",
+      {
+        order: {
+          ...task.order,
+          delivery: { type: "home", wilaya_code: 70, commune: null },
+        },
+      },
+    ],
+    [
+      "a place given as free text",
+      {
+        order: {
+          ...task.order,
+          delivery: { type: "home", region: "Alger", city: "Bab Ezzouar" },
+        },
+      },
+    ],
   ])("refuses %s", async (_name, change) => {
     const response = await send({ ...task, ...change })
     expect(response.statusCode).toBe(400)

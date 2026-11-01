@@ -52,7 +52,7 @@ const task: ConfirmationOrder = {
       { title: "صباط رياضي", quantity: 1 },
     ],
     total: 6500,
-    delivery: { type: "home", region: "الجزائر", city: "باب الزوار" },
+    delivery: { type: "home", wilaya_code: 16, commune: "باب الزوار" },
   },
 }
 

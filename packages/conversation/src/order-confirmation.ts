@@ -1,20 +1,34 @@
 import type { ToolDeclaration } from "@nexus/ai"
 import type { Outcome } from "@nexus/core"
+import { resolveCommune, wilayaByCode } from "@nexus/places"
 import { darijaAmount } from "./numbers.js"
 import { WILAYAS } from "./wilayas.js"
 
+type Language = "ar" | "fr"
+type Delivery = {
+  type: "home" | "stop_desk"
+  wilaya_code: number
+  commune: string | null
+}
+
 export type ConfirmationOrder = {
   store: { name: string }
-  customer: { name: string; language: "ar" | "fr" }
+  customer: { name: string; language: Language }
   order: {
     items: { title: string; quantity: number }[]
     total: number
-    delivery: {
-      type: "home" | "stop_desk"
-      region: string
-      city: string | null
-    }
+    delivery: Delivery
   }
+}
+
+/** The commune and wilaya in the call's language; a commune not on the list is read as sent. */
+function placeName(delivery: Delivery, language: Language): string {
+  const commune = delivery.commune
+    ? (resolveCommune(delivery.wilaya_code, delivery.commune)?.[language] ??
+      delivery.commune)
+    : null
+  const wilaya = wilayaByCode(delivery.wilaya_code)?.[language]
+  return [commune, wilaya].filter(Boolean).join(", ")
 }
 
 function orderLines(task: ConfirmationOrder): string {
@@ -24,10 +38,11 @@ function orderLines(task: ConfirmationOrder): string {
       ? `Say the total exactly as "${darijaAmount(total)}". Never in centimes, and never another number.`
       : `Say the total as ${total} dinars, in words. Never in centimes.`
   const lines = items.map((item) => `- ${item.quantity} × ${item.title}`)
+  const place = placeName(delivery, task.customer.language)
   const where =
     delivery.type === "home"
-      ? `home delivery to ${delivery.city ?? ""}, ${delivery.region}`
-      : `pick-up at the delivery office in ${delivery.region}`
+      ? `home delivery to ${place}`
+      : `pick-up at the delivery office in ${place}`
   return [
     ...lines,
     `Total, delivery included: ${total} dinars. ${spoken}`,

@@ -29,7 +29,7 @@ const session = await connectGeminiLive({
       order: {
         items: [{ title: "قميص قطن", quantity: 2 }],
         total: 6500,
-        delivery: { type: "home", region: "الجزائر", city: "باب الزوار" },
+        delivery: { type: "home", wilaya_code: 16, commune: "باب الزوار" },
       },
     },
     new Date()

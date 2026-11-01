@@ -46,8 +46,8 @@ export function taskInputSchema(allowHttpCallbacks: boolean) {
           delivery: z
             .object({
               type: z.enum(["home", "stop_desk"]),
-              region: z.string().max(60),
-              city: z.string().max(60).nullable(),
+              wilaya_code: z.number().int().min(1).max(69),
+              commune: z.string().min(1).max(80).nullable(),
             })
             .strict(),
         })

@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@nexus/ai": "workspace:*",
-    "@nexus/core": "workspace:*"
+    "@nexus/core": "workspace:*",
+    "@nexus/places": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.20.5"

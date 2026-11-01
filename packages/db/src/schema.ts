@@ -31,8 +31,10 @@ export type TaskPayload = {
     currency: "DZD"
     delivery: {
       type: "home" | "stop_desk"
-      region: string
-      city: string | null
+      /** 1-69, after the 2026 reform. */
+      wilaya_code: number
+      /** The commune's name in Arabic or French; read as sent if it isn't on the list. */
+      commune: string | null
     }
   }
 }

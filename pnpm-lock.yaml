@@ -127,6 +127,9 @@ importers:
       '@nexus/core':
         specifier: workspace:*
         version: link:../core
+      '@nexus/places':
+        specifier: workspace:*
+        version: link:../places
     devDependencies:
       '@types/node':
         specifier: ^22.20.5
