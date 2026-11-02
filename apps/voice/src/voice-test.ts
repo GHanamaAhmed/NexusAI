@@ -70,7 +70,7 @@ async function measure(voice: string): Promise<number[]> {
         done()
       }
     })
-    session.start(OPENING)
+    session.start(OPENING.ar)
   })
 }
 

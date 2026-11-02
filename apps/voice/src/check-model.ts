@@ -51,7 +51,7 @@ session.onTurnComplete(() => {
   )
   session.close()
 })
-session.start(OPENING)
+session.start(OPENING.ar)
 setTimeout(() => {
   console.log(`${model}: no answer in 20 s`)
   process.exit(1)

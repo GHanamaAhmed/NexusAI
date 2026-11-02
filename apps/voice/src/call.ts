@@ -241,7 +241,7 @@ export class Call {
         clearInterval(check)
         this.greeted = true
         this.log(`(greeting; the customer ${spoke ? "spoke" : "said nothing"})`)
-        session.start(OPENING)
+        session.start(OPENING[this.deps.order.customer.language])
       }
     }, 100)
     this.timers.push(check)

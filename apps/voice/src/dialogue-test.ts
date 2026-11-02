@@ -196,7 +196,7 @@ async function run(scenario: Scenario): Promise<Result> {
         done()
       }
     })
-    session.start(OPENING)
+    session.start(OPENING[order.customer.language])
   })
 }
 

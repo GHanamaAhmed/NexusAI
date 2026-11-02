@@ -133,7 +133,7 @@ describe("Call", () => {
     await answer()
     expect(sessions).toHaveLength(2)
     greet()
-    expect(sessions[1]!.started).toEqual([OPENING])
+    expect(sessions[1]!.started).toEqual([OPENING.ar])
     expect(hungUp()).toBe(false)
   })
 
@@ -146,7 +146,7 @@ describe("Call", () => {
     vi.advanceTimersByTime(300)
     expect(sessions[0]!.started).toEqual([])
     vi.advanceTimersByTime(200)
-    expect(sessions[0]!.started).toEqual([OPENING])
+    expect(sessions[0]!.started).toEqual([OPENING.ar])
   })
 
   it("greets after 2 s when the customer says nothing", async () => {
@@ -154,7 +154,7 @@ describe("Call", () => {
     vi.advanceTimersByTime(1_900)
     expect(sessions[0]!.started).toEqual([])
     vi.advanceTimersByTime(100)
-    expect(sessions[0]!.started).toEqual([OPENING])
+    expect(sessions[0]!.started).toEqual([OPENING.ar])
   })
 
   it("greets after 3 s at the latest, while the customer keeps talking", async () => {
@@ -165,7 +165,7 @@ describe("Call", () => {
     }
     expect(sessions[0]!.started).toEqual([])
     vi.advanceTimersByTime(100)
-    expect(sessions[0]!.started).toEqual([OPENING])
+    expect(sessions[0]!.started).toEqual([OPENING.ar])
   })
 
   it("keeps the allo from the model, and passes what follows the greeting", async () => {

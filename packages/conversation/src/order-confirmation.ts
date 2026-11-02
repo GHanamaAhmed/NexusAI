@@ -104,7 +104,13 @@ When to call each function:
 }
 
 /** The first turn: the line is open and the customer has answered. */
-export const OPENING = "The customer has answered. Start the call now."
+/**
+ * What starts the call, sent as the customer's first words once they've
+ * picked up. An instruction in English here ("The customer has answered...")
+ * made the agent call confirm_order before its first word in about 1 greeting
+ * in 3; their "allo" did it in none of 30.
+ */
+export const OPENING: Record<Language, string> = { ar: "ألو؟", fr: "Allô ?" }
 
 export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
   {
