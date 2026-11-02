@@ -59,6 +59,13 @@ jobs:
       - name: Compose file
         env:
           ASTERISK_IMAGE: example
+          API_IMAGE: example
+          WORKER_IMAGE: example
+          VOICE_IMAGE: example
           PROVIDER_ROUTE_NAME: sip.example.com
           PROVIDER_IP: 192.0.2.1
+          POSTGRES_PASSWORD: example
+          GEMINI_API_KEY: example
+          ARI_PASSWORD: example
+          PUBLIC_HOST: api.example.com
         run: docker compose -f deploy/compose.yml config -q

@@ -21,10 +21,13 @@ journald_max_use: 500M
 unattended_reboot_time: "04:30"
 
 # Asterisk uses the host network, so its call-audio range is opened here.
-# Only Caddy publishes ports (80 and 443, once the API is served).
+# Caddy serves the API on 80 and 443 (443/udp for HTTP/3).
 firewall_allowed:
   - { rule: limit, port: "22", proto: tcp }
   - { rule: allow, port: "10000:10199", proto: udp }
+  - { rule: allow, port: "80", proto: tcp }
+  - { rule: allow, port: "443", proto: tcp }
+  - { rule: allow, port: "443", proto: udp }
 
 # The deploy script checks every image's signature with it.
 cosign_version: "2.4.1"

@@ -27,6 +27,9 @@
     - { path: releases, owner: deploy, group: deploy, mode: "0750" }
     - { path: sounds, owner: root, group: root, mode: "0755" }
     - { path: backups, owner: root, group: root, mode: "0700" }
+    # Postgres's image takes ownership of its folder when it starts.
+    - { path: postgres, owner: root, group: root, mode: "0700" }
+    - { path: caddy, owner: root, group: root, mode: "0700" }
   # Needs the users above; a dry run doesn't create them.
   ignore_errors: "{{ ansible_check_mode }}"
 
@@ -51,6 +54,7 @@
         group: root,
         mode: "0700",
       }
+    - { src: deploy/bin/backup, name: backup, group: root, mode: "0700" }
   # Needs the users above; a dry run doesn't create them.
   ignore_errors: "{{ ansible_check_mode }}"
 
@@ -76,3 +80,27 @@
   no_log: true
   # Needs the users above; a dry run doesn't create them.
   ignore_errors: "{{ ansible_check_mode }}"
+
+# Added to internal.env once, after the file was first made.
+- name: Read the internal passwords
+  ansible.builtin.slurp:
+    src: "{{ nexus_root }}/internal.env"
+  register: internal_env
+  no_log: true
+  # The file is made above; a dry run doesn't make it.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Database password, made once
+  ansible.builtin.lineinfile:
+    path: "{{ nexus_root }}/internal.env"
+    line: "POSTGRES_PASSWORD={{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"
+  when: "'POSTGRES_PASSWORD=' not in (internal_env.content | default('') | b64decode)"
+  no_log: true
+
+- name: Nightly database dump
+  ansible.builtin.cron:
+    name: nexus database dump
+    user: root
+    hour: "3"
+    minute: "30"
+    job: "{{ nexus_root }}/bin/backup >> /var/log/nexus-backup.log 2>&1"

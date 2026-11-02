@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Dumps the database into /srv/nexus/backups and keeps the last seven. Root's
+# cron runs it at 03:30 UTC (server playbook, role nexus). Restoring:
+# deploy/README.md.
+set -euo pipefail
+
+ROOT=${NEXUS_ROOT:-/srv/nexus}
+dump="$ROOT/backups/nexus-$(date -u +%F).sql.gz"
+
+docker exec nexus-postgres-1 pg_dump -U nexus nexus | gzip >"$dump.tmp"
+mv "$dump.tmp" "$dump"
+find "$ROOT/backups" -name 'nexus-*.sql.gz' -mtime +6 -delete

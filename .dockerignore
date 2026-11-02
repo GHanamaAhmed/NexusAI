@@ -1,0 +1,9 @@
+# The app images need the workspace's packages and lockfile, nothing else.
+**/node_modules
+**/*.test.ts
+**/.env*
+.git
+.github
+deploy
+docs
+infra

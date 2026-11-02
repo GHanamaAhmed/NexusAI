@@ -14,13 +14,14 @@ set -euo pipefail
 ROOT=${NEXUS_ROOT:-/srv/nexus}
 REPO=GHanamaAhmed/NexusAI
 REGISTRY=ghcr.io/ghanamaahmed
-IMAGES=(asterisk)
+IMAGES=(asterisk api worker voice)
 # Only images signed by this repository's build workflow on main are run.
 SIGNER="^https://github\\.com/$REPO/\\.github/workflows/build\\.yml@refs/heads/main\$"
 ISSUER=https://token.actions.githubusercontent.com
 RELEASES=$ROOT/releases
 KEEP_RELEASES=5
 REGISTER_TIMEOUT=120
+API_TIMEOUT=60
 
 # Messages go to stderr, so functions can return values on stdout.
 log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
@@ -114,13 +115,54 @@ wait_registered() {
   return 1
 }
 
+has_service() { dc "$1" config --services | grep -qx "$2"; }
+
+# The API answers its health check, from inside its container.
+wait_api() {
+  local release=$1 deadline=$((SECONDS + API_TIMEOUT))
+  while ((SECONDS < deadline)); do
+    if dc "$release" exec -T api node -e \
+      "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))" \
+      2>/dev/null; then
+      log "the API answers"
+      return 0
+    fi
+    sleep 3
+  done
+  log "the API didn't answer within ${API_TIMEOUT}s"
+  dc "$release" logs --tail 40 api || true
+  return 1
+}
+
+# Only reported: a DNS record or certificate still on its way isn't a reason
+# to go back.
+check_public() {
+  local host
+  host=$(sed -n 's/^PUBLIC_HOST=//p' "$ROOT/.env")
+  [[ -n $host ]] || return 0
+  if curl -fsS --max-time 20 --retry 6 --retry-delay 10 --retry-all-errors \
+    "https://$host/health" >/dev/null 2>&1; then
+    log "https://$host answers"
+  else
+    log "warning: https://$host doesn't answer yet (DNS, firewall or certificate)"
+  fi
+}
+
 start_release() {
   local release=$1
+  # Releases from before the database have no postgres service.
+  if has_service "$release" postgres; then
+    dc "$release" up -d --wait postgres
+    dc "$release" run --rm --no-deps api node --import tsx src/migrate.ts
+  fi
   dc "$release" up -d --remove-orphans
   if [[ ${RESTART_ASTERISK:-} == yes ]]; then
     dc "$release" restart asterisk
   fi
-  wait_registered "$release"
+  wait_registered "$release" || return 1
+  if has_service "$release" api; then
+    wait_api "$release" || return 1
+  fi
 }
 
 record_release() {
@@ -155,6 +197,7 @@ do_deploy() {
     record_release "$VERSION" deploy
     prune_releases
     log "released $VERSION"
+    check_public
     return 0
   fi
   if [[ -n $previous && $previous != "$VERSION" && -f $RELEASES/$previous.env ]]; then

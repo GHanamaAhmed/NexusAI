@@ -2,13 +2,13 @@
 
 Prepares the NexusAI server: users, SSH, firewall, Docker, swap, automatic security updates, and what releases need. It is safe to run again; a second run changes nothing. Releases themselves come from CI ([`deploy/README.md`](../../deploy/README.md)).
 
-| Role       | What it does                                                                                                                    |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `base`     | Time zone, base packages, a swapfile, the journal's size cap, automatic security updates with a reboot at 04:30 UTC when needed |
-| `users`    | `ops` (the owner, with sudo) and `deploy` (CI, limited to the deploy gate)                                                      |
-| `docker`   | Docker Engine and Compose from Docker's repository, with log rotation                                                           |
-| `security` | SSH by key only, for `ops` and `deploy`; fail2ban; the firewall                                                                 |
-| `nexus`    | `cosign`, the folders, the release scripts, and the server's own internal passwords                                             |
+| Role       | What it does                                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`     | Time zone, base packages, a swapfile, the journal's size cap, automatic security updates with a reboot at 04:30 UTC when needed                    |
+| `users`    | `ops` (the owner, with sudo) and `deploy` (CI, limited to the deploy gate)                                                                         |
+| `docker`   | Docker Engine and Compose from Docker's repository, with log rotation                                                                              |
+| `security` | SSH by key only, for `ops` and `deploy`; fail2ban; the firewall                                                                                    |
+| `nexus`    | `cosign`, the folders, the release scripts, the server's own internal passwords (ARI and the database), and the nightly database dump at 03:30 UTC |
 
 ## Before the first run
 
@@ -43,5 +43,5 @@ ansible-playbook site.yml
 - After the first run, SSH accepts only keys, and only for `ops` and `deploy`. The cloud image's account keeps its password for the provider's web console, the way in if SSH ever locks you out.
 - fail2ban bans an address for an hour after five failed SSH logins. When signing in with a specific key, add `-o IdentitiesOnly=yes`, or SSH may try other keys first and count as failures. To lift a ban, run `sudo fail2ban-client set sshd unbanip <address>` from the web console.
 - To add a key, extend `ops_authorized_keys` and run again. The list is exclusive, so keys removed from it are removed from the server.
-- Only Caddy may publish ports. Asterisk uses the host network, so its call-audio range (UDP 10000-10199) is opened in `firewall_allowed`.
-- The provider's cloud firewall (security group) is separate from this playbook and is set in the provider's console.
+- Only Caddy (80 and 443) and Postgres (on localhost only) publish ports. Asterisk and the voice app use the host network, so the call-audio range (UDP 10000-10199) and Caddy's ports are opened in `firewall_allowed`.
+- The provider's cloud firewall (security group) is separate from this playbook and is set in the provider's console: it must allow the call-audio range from the provider's network, and 80/tcp, 443/tcp and 443/udp from anywhere.

@@ -13,10 +13,10 @@
     "@nexus/db": "workspace:*",
     "fastify": "^5.12.7",
     "kysely": "^0.29.7",
+    "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^22.20.5",
-    "tsx": "^4.23.15"
+    "@types/node": "^22.20.5"
   }
 }

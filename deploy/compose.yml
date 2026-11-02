@@ -27,6 +27,97 @@ services:
       - asterisk-spool:/var/spool/asterisk
     logging: *logging
 
+  # Tasks and their results. Published on localhost only, for the voice app on
+  # the host network.
+  postgres:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_DB: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - /srv/nexus/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "nexus", "-d", "nexus"]
+      interval: 5s
+      retries: 12
+    mem_limit: 512m
+    logging: *logging
+
+  # Takes tasks from clients; Caddy is its only way in.
+  api:
+    image: ${API_IMAGE:?}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
+      CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 256m
+    logging: *logging
+
+  # Checks tasks with their clients, queues calls, sends results.
+  worker:
+    image: ${WORKER_IMAGE:?}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
+      CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+      HEALTHCHECK_URL: ${HEALTHCHECK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 256m
+    logging: *logging
+
+  # Dials queued calls and holds the conversations. Host networking, to reach
+  # ARI and the media socket on localhost. It dials nothing unless
+  # CALLS_ENABLED is true.
+  voice:
+    image: ${VOICE_IMAGE:?}
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@127.0.0.1:5432/nexus
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?}
+      ARI_PASSWORD: ${ARI_PASSWORD:?}
+      CALLS_ENABLED: ${CALLS_ENABLED:-false}
+      CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+      DIAL_FORMAT: ${DIAL_FORMAT:-national}
+      VOICE_AR: ${VOICE_AR:-}
+      VOICE_FR: ${VOICE_FR:-}
+      MAX_CALLS_PER_LINE: ${MAX_CALLS_PER_LINE:-}
+      MAX_CALLS_TOTAL: ${MAX_CALLS_TOTAL:-}
+      MAX_CALLS_PER_STORE: ${MAX_CALLS_PER_STORE:-}
+    volumes:
+      - asterisk-run:/var/run/asterisk:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Calls in progress finish before it stops (150 s at most).
+    stop_grace_period: 3m
+    mem_limit: 384m
+    logging: *logging
+
+  # HTTPS for the API, with certificates from Let's Encrypt.
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${PUBLIC_HOST:?} --to api:3000
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - /srv/nexus/caddy:/data
+    depends_on:
+      - api
+    logging: *logging
+
 volumes:
   asterisk-run:
   asterisk-spool:
