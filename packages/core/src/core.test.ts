@@ -9,6 +9,7 @@ import {
   OUTCOMES,
   parseCallWindow,
   toDialString,
+  unansweredOutcome,
 } from "./index.js"
 
 const window = parseCallWindow("09:00-20:00")
@@ -108,5 +109,20 @@ describe("outcomes", () => {
       "unreachable",
       "no_input",
     ])
+  })
+
+  it.each([
+    [17, "busy"],
+    [21, "busy"],
+    [1, "invalid_number"],
+    [28, "invalid_number"],
+    [20, "unreachable"],
+    [27, "unreachable"],
+    [34, "unreachable"],
+    [18, "no_answer"],
+    [19, "no_answer"],
+    [null, "no_answer"],
+  ] as const)("reads hang-up cause %s as %s", (cause, outcome) => {
+    expect(unansweredOutcome(cause)).toBe(outcome)
   })
 })

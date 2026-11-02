@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { ToolDeclaration, VoiceSession } from "@nexus/ai"
+import type { ToolDeclaration, Usage, VoiceSession } from "@nexus/ai"
 import {
   answerLookup,
   buildInstruction,
@@ -47,7 +47,8 @@ export type CallResult = {
   change: PlaceChange | null
   /** Q.850 hang-up cause. */
   cause: number | null
-  usage: { promptTokens: number; responseTokens: number }
+  answeredAt: Date | null
+  usage: Usage
   agentSaid: string[]
 }
 
@@ -68,7 +69,8 @@ export class Call {
   private resolve!: (result: CallResult) => void
   private readonly id = randomUUID()
   private readonly callChannel = `call-${this.id}`
-  private readonly mediaChannel = `ws-${this.id}`
+  /** The audio channel's id, which Asterisk names when its audio connects. */
+  readonly mediaChannel = `ws-${this.id}`
   private readonly bridgeId = `bridge-${this.id}`
   private readonly started = Date.now()
   private session: Session | null = null
@@ -85,7 +87,13 @@ export class Call {
   private ended = false
   private lastCustomerVoiceAt = 0
   private agentTurnAudio: Buffer[] = []
-  private readonly usage = { promptTokens: 0, responseTokens: 0 }
+  private readonly usage: Usage = {
+    promptTokens: 0,
+    responseTokens: 0,
+    promptAudioTokens: 0,
+    cachedTokens: 0,
+    responseAudioTokens: 0,
+  }
   private readonly agentSaid: string[] = []
   private readonly timers: NodeJS.Timeout[] = []
 
@@ -122,7 +130,8 @@ export class Call {
       this.end(`could not dial: ${String(error)}`, null)
       throw error
     }
-    this.log(`calling ${this.deps.endpoint}`)
+    // The line, not the number: logs hold no customer's number.
+    this.log(`calling on ${this.deps.endpoint.split("@")[1]}`)
     this.timers.push(
       setTimeout(() => {
         this.log("time limit")
@@ -188,8 +197,9 @@ export class Call {
       }
     })
     session.onUsage((usage) => {
-      this.usage.promptTokens += usage.promptTokens
-      this.usage.responseTokens += usage.responseTokens
+      for (const key of Object.keys(this.usage) as (keyof Usage)[]) {
+        this.usage[key] += usage[key]
+      }
       this.log(
         `(usage report: prompt ${usage.promptTokens}, response ${usage.responseTokens})`
       )
@@ -379,6 +389,7 @@ export class Call {
       args: this.args,
       change: this.change,
       cause,
+      answeredAt: this.answeredAt ? new Date(this.answeredAt) : null,
       usage: { ...this.usage },
       agentSaid: [...this.agentSaid],
     })

@@ -52,7 +52,6 @@ export function taskInputSchema(allowHttpCallbacks: boolean) {
             .strict(),
         })
         .strict(),
-      mode: z.enum(["keypad", "spoken"]).default("keypad"),
       callbacks: z
         .object({ outcome_url: callback, check_url: callback })
         .strict(),
@@ -107,7 +106,6 @@ export async function createTask(
       reference: task.reference ?? null,
       payload: JSON.stringify(payload),
       language: task.customer.language,
-      mode: task.mode,
       outcome_url: task.callbacks.outcome_url,
       check_url: task.callbacks.check_url,
       next_attempt_at: firstAttemptAt(now, window),

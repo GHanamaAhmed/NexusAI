@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 import {
   answerLookup,
   buildInstruction,
+  CONFIRMATION_TOOLS,
   type ConfirmationOrder,
+  outcomeForTool,
   placeChange,
   refuseOutcome,
   saidYes,
@@ -60,6 +62,25 @@ describe("buildInstruction", () => {
     expect(text).not.toContain("أولف")
     expect(text).toContain("never the street or the address")
     expect(text).toContain("never suggest picking the order up at an office")
+  })
+})
+
+describe("outcomeForTool", () => {
+  it("gives each outcome function its outcome, and the lookup none", () => {
+    expect(
+      Object.fromEntries(
+        CONFIRMATION_TOOLS.map(({ name }) => [name, outcomeForTool(name)])
+      )
+    ).toEqual({
+      confirm_order: "confirmed",
+      cancel_order: "cancelled",
+      call_later: "call_later",
+      wrong_number: "wrong_number",
+      request_change: "request_change",
+      find_place: null,
+      talk_to_store: "talk_to_store",
+      answering_machine: "machine",
+    })
   })
 })
 

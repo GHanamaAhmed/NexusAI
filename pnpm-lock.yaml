@@ -60,6 +60,12 @@ importers:
       '@nexus/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@nexus/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      kysely:
+        specifier: ^0.29.7
+        version: 0.29.7
       ws:
         specifier: ^8.22.0
         version: 8.22.0

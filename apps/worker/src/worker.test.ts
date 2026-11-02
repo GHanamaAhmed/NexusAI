@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest"
 import { deliverWebhooks } from "./deliver.js"
+import { finishAttempts } from "./finish.js"
 import { isHealthy, purgeExpiredTasks } from "./housekeeping.js"
 import { type CheckRequest, promoteDueTasks } from "./promote.js"
 
@@ -48,7 +49,6 @@ describe("worker", () => {
         idempotency_key: "order-1",
         payload: JSON.stringify({}),
         language: "ar",
-        mode: "keypad",
         outcome_url: "https://client.example.com/outcome",
         check_url: "https://client.example.com/check",
         next_attempt_at: new Date(noon.getTime() - 60_000),
@@ -128,6 +128,134 @@ describe("worker", () => {
       const early = new Date(noon.getTime() - 3_600_000)
       await promoteDueTasks(db, { window, check: async () => true, now: early })
       expect((await readTask(id)).status).toBe("scheduled")
+    })
+  })
+
+  describe("finishAttempts", () => {
+    async function finished(values: {
+      number?: number
+      outcome: string
+      note?: string
+      callback_at?: Date
+      change?: { wilaya_code: number; commune_ar: string; commune_fr: string }
+    }) {
+      const number = values.number ?? 1
+      const { id: taskId } = await makeTask({ attempts: number })
+      await db
+        .updateTable("task")
+        .set({ status: "calling" })
+        .where("id", "=", taskId)
+        .execute()
+      const { id: attemptId } = await db
+        .insertInto("attempt")
+        .values({
+          task_id: taskId,
+          number,
+          status: "done",
+          line: "line01",
+          started_at: noon,
+          ended_at: noon,
+          outcome: values.outcome,
+          note: values.note ?? null,
+          callback_at: values.callback_at ?? null,
+          change: values.change ? JSON.stringify(values.change) : null,
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow()
+      return { taskId, attemptId }
+    }
+
+    const deliveriesOf = (taskId: string) =>
+      db
+        .selectFrom("webhook_delivery")
+        .selectAll()
+        .where("task_id", "=", taskId)
+        .execute()
+
+    it("completes the task on a final answer, and sends the result", async () => {
+      const change = {
+        wilaya_code: 1,
+        commune_ar: "رقان",
+        commune_fr: "Reggane",
+      }
+      const { taskId, attemptId } = await finished({
+        outcome: "request_change",
+        note: "تبديل لرقان",
+        change,
+      })
+      expect(await finishAttempts(db, { window, now: noon })).toBe(1)
+      expect(await readTask(taskId)).toMatchObject({
+        status: "done",
+        outcome: "request_change",
+        completed_at: noon,
+      })
+      const [delivery] = await deliveriesOf(taskId)
+      expect(delivery).toMatchObject({
+        event: "task.completed",
+        attempt_id: attemptId,
+        status: "pending",
+        next_try_at: noon,
+      })
+      expect(delivery!.body).toEqual({
+        event: "task.completed",
+        task_id: taskId,
+        attempt_id: attemptId,
+        external_store_id: "store-1",
+        external_id: "order-1",
+        reference: null,
+        attempt: 1,
+        max_attempts: 3,
+        outcome: "request_change",
+        note: "تبديل لرقان",
+        callback_at: null,
+        change,
+        ended_at: noon.toISOString(),
+      })
+    })
+
+    it("schedules the next try after no answer, and tells the client", async () => {
+      const { taskId } = await finished({ outcome: "no_answer" })
+      await finishAttempts(db, { window, now: noon })
+      const task = await readTask(taskId)
+      expect(task.status).toBe("scheduled")
+      expect(task.next_attempt_at).toEqual(new Date(noon.getTime() + 3_600_000))
+      expect(task.outcome).toBeNull()
+      const [delivery] = await deliveriesOf(taskId)
+      expect(delivery!.event).toBe("task.attempted")
+      expect(delivery!.body).toMatchObject({ attempt: 1, outcome: "no_answer" })
+    })
+
+    it("completes the task after the last try", async () => {
+      const { taskId } = await finished({ number: 3, outcome: "busy" })
+      await finishAttempts(db, { window, now: noon })
+      expect(await readTask(taskId)).toMatchObject({
+        status: "done",
+        outcome: "busy",
+      })
+      expect((await deliveriesOf(taskId))[0]!.event).toBe("task.completed")
+    })
+
+    it("passes on when to call back", async () => {
+      const when = new Date("2026-10-31T15:00:00Z")
+      const { taskId } = await finished({
+        outcome: "call_later",
+        callback_at: when,
+      })
+      await finishAttempts(db, { window, now: noon })
+      expect((await deliveriesOf(taskId))[0]!.body).toMatchObject({
+        outcome: "call_later",
+        callback_at: when.toISOString(),
+      })
+    })
+
+    it("makes each result once", async () => {
+      const { taskId } = await finished({ outcome: "confirmed" })
+      await Promise.all([
+        finishAttempts(db, { window, now: noon }),
+        finishAttempts(db, { window, now: noon }),
+      ])
+      await finishAttempts(db, { window, now: noon })
+      expect(await deliveriesOf(taskId)).toHaveLength(1)
     })
   })
 

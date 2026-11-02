@@ -89,7 +89,6 @@ describe("API", () => {
       .selectAll()
       .executeTakeFirstOrThrow()
     expect(stored.status).toBe("scheduled")
-    expect(stored.mode).toBe("keypad")
     expect(stored.next_attempt_at.getTime()).toBeGreaterThan(Date.now())
     expect(stored.purge_after.getTime()).toBeGreaterThan(Date.now())
   })

@@ -23,6 +23,8 @@ type Result = {
   calls: Called[]
   /** The first outcome function; any later one is ignored. */
   outcome?: Called
+  /** How many customer lines had been said when the outcome came. */
+  outcomeAfter?: number
   lookups: Record<string, unknown>[]
 }
 type Scenario = {
@@ -80,6 +82,14 @@ const SCENARIOS: Scenario[] = [
       result.outcome?.name === "confirm_order" && !lookedUp(result)
         ? null
         : "expected confirm_order and no find_place",
+  },
+  {
+    name: "cancel, asked once more",
+    customer: ["إيه أنا", "لا، ما نحبش نديها", "إيه، لغيها", "إيه، متأكد"],
+    check: ({ outcome, outcomeAfter }) =>
+      outcome?.name === "cancel_order" && (outcomeAfter ?? 0) >= 3
+        ? null
+        : `${outcome?.name ?? "no outcome"} after ${outcomeAfter} lines; expected cancel_order, never on the first "no"`,
   },
   {
     name: "change, misheard spelling",
@@ -182,6 +192,7 @@ async function run(scenario: Scenario): Promise<Result> {
       }
       if (outcomeForTool(name) && !result.outcome) {
         result.outcome = { name, args }
+        result.outcomeAfter = next
       } else if (outcomeForTool(name)) {
         console.log(`  (ignored ${name}: the outcome is already set)`)
       }

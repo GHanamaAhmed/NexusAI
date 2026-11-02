@@ -108,6 +108,26 @@ async function initialDown(db: Kysely<unknown>) {
   `.execute(db)
 }
 
+/**
+ * Every call is spoken, so tasks lose their mode. An attempt keeps the new
+ * place the customer confirmed, and when they asked to be called back.
+ */
+async function callResultsUp(db: Kysely<unknown>) {
+  await sql`
+    ALTER TABLE attempt ADD COLUMN change jsonb, ADD COLUMN callback_at timestamptz;
+    ALTER TABLE task DROP COLUMN mode;
+  `.execute(db)
+}
+
+async function callResultsDown(db: Kysely<unknown>) {
+  await sql`
+    ALTER TABLE task ADD COLUMN mode text NOT NULL DEFAULT 'spoken'
+      CHECK (mode IN ('keypad', 'spoken'));
+    ALTER TABLE attempt DROP COLUMN callback_at, DROP COLUMN change;
+  `.execute(db)
+}
+
 export const migrations: Record<string, Migration> = {
   "0001_initial": { up: initialUp, down: initialDown },
+  "0002_call_results": { up: callResultsUp, down: callResultsDown },
 }

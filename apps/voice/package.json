@@ -12,6 +12,8 @@
     "@nexus/ai": "workspace:*",
     "@nexus/conversation": "workspace:*",
     "@nexus/core": "workspace:*",
+    "@nexus/db": "workspace:*",
+    "kysely": "^0.29.7",
     "ws": "^8.22.0"
   },
   "devDependencies": {

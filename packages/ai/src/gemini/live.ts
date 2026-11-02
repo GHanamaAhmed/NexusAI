@@ -2,12 +2,19 @@ import {
   Behavior,
   GoogleGenAI,
   type LiveServerMessage,
+  MediaModality,
   Modality,
+  type ModalityTokenCount,
   type Session,
   ThinkingLevel,
   Type,
 } from "@google/genai"
-import type { ToolCall, ToolDeclaration, VoiceSession } from "../index.js"
+import type {
+  ToolCall,
+  ToolDeclaration,
+  Usage,
+  VoiceSession,
+} from "../index.js"
 
 const DEFAULT_MODEL = "gemini-3.8-live"
 const SILENCE_BEFORE_TURN_ENDS_MS = 600
@@ -21,10 +28,7 @@ class GeminiLiveSession implements VoiceSession {
   private transcript: (who: "customer" | "agent", text: string) => void =
     () => {}
   private turnComplete: () => void = () => {}
-  private usage: (usage: {
-    promptTokens: number
-    responseTokens: number
-  }) => void = () => {}
+  private usage: (usage: Usage) => void = () => {}
   private heard = ""
   private said = ""
 
@@ -43,9 +47,7 @@ class GeminiLiveSession implements VoiceSession {
   onTurnComplete(listener: () => void) {
     this.turnComplete = listener
   }
-  onUsage(
-    listener: (usage: { promptTokens: number; responseTokens: number }) => void
-  ) {
+  onUsage(listener: (usage: Usage) => void) {
     this.usage = listener
   }
 
@@ -114,6 +116,9 @@ class GeminiLiveSession implements VoiceSession {
       this.usage({
         promptTokens: usage.promptTokenCount ?? 0,
         responseTokens: usage.responseTokenCount ?? 0,
+        promptAudioTokens: audioTokens(usage.promptTokensDetails),
+        cachedTokens: usage.cachedContentTokenCount ?? 0,
+        responseAudioTokens: audioTokens(usage.responseTokensDetails),
       })
     }
   }
@@ -124,6 +129,12 @@ class GeminiLiveSession implements VoiceSession {
       functionResponses: [{ id: call.id, name: call.name, response }],
     })
   }
+}
+
+function audioTokens(details: ModalityTokenCount[] = []): number {
+  return details
+    .filter((detail) => detail.modality === MediaModality.AUDIO)
+    .reduce((sum, detail) => sum + (detail.tokenCount ?? 0), 0)
 }
 
 /** Opens a spoken conversation with Gemini Live. */

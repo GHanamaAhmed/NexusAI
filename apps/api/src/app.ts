@@ -98,7 +98,15 @@ export async function buildApp(options: {
     }
     const attempts = await db
       .selectFrom("attempt")
-      .select(["number", "status", "outcome", "note", "hangup_cause"])
+      .select([
+        "number",
+        "status",
+        "outcome",
+        "note",
+        "change",
+        "callback_at",
+        "hangup_cause",
+      ])
       .where("task_id", "=", task.id)
       .orderBy("number")
       .execute()

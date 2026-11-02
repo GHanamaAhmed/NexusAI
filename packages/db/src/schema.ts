@@ -17,9 +17,15 @@ type NullableTimestamp = ColumnType<
 export type TaskStatus = "scheduled" | "calling" | "done" | "cancelled"
 export type AttemptStatus = "queued" | "dialing" | "answered" | "done"
 export type DeliveryStatus = "pending" | "delivered" | "failed"
-export type TaskMode = "keypad" | "spoken"
 export type TaskLanguage = "ar" | "fr"
 export type DeliveryEvent = "task.attempted" | "task.completed"
+
+/** A new place the customer confirmed on a call. */
+export type AttemptChange = {
+  wilaya_code: number
+  commune_ar: string
+  commune_fr: string
+}
 
 /** What a task needs to say and do; the client's system stays the record. */
 export type TaskPayload = {
@@ -73,7 +79,6 @@ export interface TaskTable {
   reference: string | null
   payload: JSONColumnType<TaskPayload>
   language: TaskLanguage
-  mode: TaskMode
   outcome_url: string
   check_url: string
   status: ColumnType<TaskStatus, TaskStatus | undefined, TaskStatus>
@@ -102,6 +107,9 @@ export interface AttemptTable {
   note: string | null
   transcript: JSONColumnType<{ who: string; text: string }[]> | null
   cost: JSONColumnType<Record<string, number>> | null
+  change: JSONColumnType<AttemptChange> | null
+  /** When the customer asked to be called back. */
+  callback_at: NullableTimestamp
 }
 
 export interface WebhookDeliveryTable {

@@ -37,7 +37,6 @@ describe("database", () => {
         reference: null,
         payload: JSON.stringify({}),
         language: "ar",
-        mode: "keypad",
         outcome_url: "https://example.com/o",
         check_url: "https://example.com/c",
         next_attempt_at: new Date(),

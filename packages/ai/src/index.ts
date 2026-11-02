@@ -22,6 +22,17 @@ export type ToolCall = {
   args: Record<string, unknown>
 }
 
+/** Tokens a turn used, as the model's provider reported them. */
+export type Usage = {
+  promptTokens: number
+  responseTokens: number
+  /** Of the prompt: audio, and tokens the provider had cached. */
+  promptAudioTokens: number
+  cachedTokens: number
+  /** Of the response: audio. */
+  responseAudioTokens: number
+}
+
 /** One spoken conversation with a model; only src/gemini knows which one. */
 export interface VoiceSession {
   sendAudio(pcm: Buffer, sampleRate: number): void
@@ -32,9 +43,7 @@ export interface VoiceSession {
     listener: (who: "customer" | "agent", text: string) => void
   ): void
   onTurnComplete(listener: () => void): void
-  onUsage(
-    listener: (usage: { promptTokens: number; responseTokens: number }) => void
-  ): void
+  onUsage(listener: (usage: Usage) => void): void
   start(openingText: string): void
   close(): void
 }

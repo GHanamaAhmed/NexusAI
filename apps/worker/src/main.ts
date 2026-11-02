@@ -2,6 +2,7 @@ import { parseCallWindow } from "@nexus/core"
 import { createDb } from "@nexus/db"
 import { loadConfig } from "./config.js"
 import { deliverWebhooks } from "./deliver.js"
+import { finishAttempts } from "./finish.js"
 import { pingHealthcheck, purgeExpiredTasks } from "./housekeeping.js"
 import { promoteDueTasks } from "./promote.js"
 
@@ -27,6 +28,7 @@ function every(ms: number, name: string, job: () => Promise<unknown>) {
 
 const timers = [
   every(10_000, "promote", () => promoteDueTasks(db, { window })),
+  every(5_000, "finish", () => finishAttempts(db, { window })),
   every(5_000, "deliver", () => deliverWebhooks(db)),
   every(60 * 60_000, "purge", () => purgeExpiredTasks(db)),
 ]
