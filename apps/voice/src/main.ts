@@ -1,4 +1,4 @@
-import { connectGeminiLive } from "@nexus/ai"
+import { connectGeminiLive, DEFAULT_LIVE_MODEL } from "@nexus/ai"
 import { createDb } from "@nexus/db"
 import { Ari } from "./ari.js"
 import { Call } from "./call.js"
@@ -22,6 +22,7 @@ const dialer = new Dialer({
   window: config.callWindow,
   dialFormat: config.dialFormat,
   limits: config.limits,
+  model: config.liveModel ?? DEFAULT_LIVE_MODEL,
   log,
   startCall: (order, endpoint) => {
     const call: Call = new Call({

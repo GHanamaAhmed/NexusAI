@@ -138,6 +138,9 @@ describe("worker", () => {
       note?: string
       callback_at?: Date
       change?: { wilaya_code: number; commune_ar: string; commune_fr: string }
+      answered_at?: Date
+      ended_at?: Date
+      cost?: Record<string, number | string>
     }) {
       const number = values.number ?? 1
       const { id: taskId } = await makeTask({ attempts: number })
@@ -154,7 +157,9 @@ describe("worker", () => {
           status: "done",
           line: "line01",
           started_at: noon,
-          ended_at: noon,
+          answered_at: values.answered_at ?? null,
+          ended_at: values.ended_at ?? noon,
+          cost: values.cost ? JSON.stringify(values.cost) : null,
           outcome: values.outcome,
           note: values.note ?? null,
           callback_at: values.callback_at ?? null,
@@ -210,6 +215,43 @@ describe("worker", () => {
         callback_at: null,
         change,
         ended_at: noon.toISOString(),
+        usage: { model: null, answered_seconds: 0, usd: 0 },
+      })
+    })
+
+    it("reports what an answered call used", async () => {
+      const { taskId } = await finished({
+        outcome: "confirmed",
+        answered_at: noon,
+        ended_at: new Date(noon.getTime() + 61_500),
+        cost: { usd: 0.03, prompt_audio_tokens: 900, model: "voice-1" },
+      })
+      await finishAttempts(db, { window, now: noon })
+      const [delivery] = await deliveriesOf(taskId)
+      expect(delivery!.body).toMatchObject({
+        usage: { model: "voice-1", answered_seconds: 62, usd: 0.03 },
+      })
+    })
+
+    it("reports an answered call with no cost as costing nothing", async () => {
+      const { taskId } = await finished({
+        outcome: "no_input",
+        answered_at: noon,
+        ended_at: new Date(noon.getTime() + 5_000),
+      })
+      await finishAttempts(db, { window, now: noon })
+      const [delivery] = await deliveriesOf(taskId)
+      expect(delivery!.body).toMatchObject({
+        usage: { model: null, answered_seconds: 5, usd: 0 },
+      })
+    })
+
+    it("reports nothing used by a call nobody answered", async () => {
+      const { taskId } = await finished({ outcome: "no_answer" })
+      await finishAttempts(db, { window, now: noon })
+      const [delivery] = await deliveriesOf(taskId)
+      expect(delivery!.body).toMatchObject({
+        usage: { model: null, answered_seconds: 0, usd: 0 },
       })
     })
 

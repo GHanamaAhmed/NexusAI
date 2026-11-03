@@ -16,7 +16,7 @@ import type {
   VoiceSession,
 } from "../index.js"
 
-const DEFAULT_MODEL = "gemini-3.8-live"
+export const DEFAULT_LIVE_MODEL = "gemini-3.8-live"
 const SILENCE_BEFORE_TURN_ENDS_MS = 600
 
 class GeminiLiveSession implements VoiceSession {
@@ -149,7 +149,7 @@ export async function connectGeminiLive(options: {
   const live = new GeminiLiveSession()
   const ai = new GoogleGenAI({ apiKey: options.apiKey })
 
-  const model = options.model ?? DEFAULT_MODEL
+  const model = options.model ?? DEFAULT_LIVE_MODEL
   // The extended-thinking model takes asynchronous functions only, and needs
   // to be told how much to think.
   const thinking = model.includes("extended-thinking")

@@ -106,7 +106,7 @@ export interface AttemptTable {
   outcome: string | null
   note: string | null
   transcript: JSONColumnType<{ who: string; text: string }[]> | null
-  cost: JSONColumnType<Record<string, number>> | null
+  cost: JSONColumnType<Record<string, number | string>> | null
   change: JSONColumnType<AttemptChange> | null
   /** When the customer asked to be called back. */
   callback_at: NullableTimestamp

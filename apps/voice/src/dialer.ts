@@ -71,6 +71,8 @@ export class Dialer {
       window: CallWindow
       dialFormat: DialFormat
       limits: Limits
+      /** The voice model calls use, recorded with each call's cost. */
+      model: string
       log: (line: string) => void
     }
   ) {}
@@ -257,7 +259,10 @@ export class Dialer {
             )
           : null,
         cost: result.usage.promptTokens
-          ? JSON.stringify(callCost(result.usage))
+          ? JSON.stringify({
+              ...callCost(result.usage),
+              model: this.deps.model,
+            })
           : null,
       })
       .where("id", "=", attemptId)

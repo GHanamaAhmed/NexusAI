@@ -28,6 +28,19 @@ export type ResultBody = {
   /** The new place the customer confirmed, with request_change. */
   change: AttemptChange | null
   ended_at: string
+  /** What the call used: nothing is billed when nobody answered. */
+  usage: {
+    model: string | null
+    answered_seconds: number
+    usd: number
+  }
+}
+
+/** The whole seconds a call was answered for; 0 when it wasn't. */
+function answeredSeconds(answeredAt: Date | null, endedAt: Date) {
+  return answeredAt
+    ? Math.max(0, Math.ceil((endedAt.getTime() - answeredAt.getTime()) / 1000))
+    : 0
 }
 
 /**
@@ -56,6 +69,8 @@ export async function finishAttempts(
         "attempt.callback_at",
         "attempt.change",
         "attempt.ended_at",
+        "attempt.answered_at",
+        "attempt.cost",
         "task.external_id",
         "task.reference",
         "client_store.external_id as external_store_id",
@@ -99,6 +114,12 @@ export async function finishAttempts(
         callback_at: attempt.callback_at?.toISOString() ?? null,
         change: attempt.change,
         ended_at: endedAt.toISOString(),
+        usage: {
+          model:
+            typeof attempt.cost?.model === "string" ? attempt.cost.model : null,
+          answered_seconds: answeredSeconds(attempt.answered_at, endedAt),
+          usd: typeof attempt.cost?.usd === "number" ? attempt.cost.usd : 0,
+        },
       }
       await trx
         .insertInto("webhook_delivery")

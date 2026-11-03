@@ -91,7 +91,8 @@ After every call, `POST` to `outcome_url`, signed, with an `x-nexus-delivery` he
   "note": "حاب يبدل لرقان",
   "callback_at": null,
   "change": { "wilaya_code": 1, "commune_ar": "رقان", "commune_fr": "Reggane" },
-  "ended_at": "2026-11-02T10:04:31.000Z"
+  "ended_at": "2026-11-02T10:04:31.000Z",
+  "usage": { "model": "gemini-3.8-live", "answered_seconds": 48, "usd": 0.018 }
 }
 ```
 
@@ -99,6 +100,7 @@ After every call, `POST` to `outcome_url`, signed, with an `x-nexus-delivery` he
 - `note` holds the customer's words the agent passed: what to change, why they cancelled, why they want the store. It's in their language, often Arabic letters.
 - `callback_at` is set with `call_later` when they gave a time; otherwise their words are in `note`.
 - `change` is set with `request_change` only when the customer confirmed a new wilaya and commune on the call. Otherwise the change is in `note`, and the store should call them.
+- `usage` is what the call used: the voice model, the seconds it was answered for (0 when nobody answered), and the model's estimated cost in US dollars, without the phone line. `model` is null and `usd` is 0 when no model spoke.
 
 Any `2xx` answer counts as delivered. Anything else, or no answer within 10 seconds, is retried after 1, 5, 15 and 60 minutes, then every hour, 24 tries in all. Use `attempt_id` to ignore a result already recorded.
 

@@ -119,6 +119,7 @@ describe("Dialer", () => {
       window,
       dialFormat: "national",
       limits: { perLine: 1, total: 10, perStore: 3, ...options.limits },
+      model: "test-model",
       log: () => {},
       startCall: (order, endpoint) => {
         const call = new FakeCall(order, endpoint)
@@ -348,7 +349,7 @@ describe("Dialer", () => {
       transcript: [{ who: "agent", text: "السلام عليكم، معايا سارة؟" }],
       callback_at: null,
     })
-    expect(attempt.cost).toMatchObject({ usd: 0.0408 })
+    expect(attempt.cost).toMatchObject({ usd: 0.0408, model: "test-model" })
   })
 
   it.each([
