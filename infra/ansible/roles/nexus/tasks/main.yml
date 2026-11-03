@@ -27,8 +27,9 @@
     - { path: releases, owner: deploy, group: deploy, mode: "0750" }
     - { path: sounds, owner: root, group: root, mode: "0755" }
     - { path: backups, owner: root, group: root, mode: "0700" }
-    # Postgres's image takes ownership of its folder when it starts.
-    - { path: postgres, owner: root, group: root, mode: "0700" }
+    # The data folder itself: owned by the Alpine image's postgres user (70),
+    # as the image leaves it. Root would lock the running database out.
+    - { path: postgres, owner: "70", group: root, mode: "0700" }
     - { path: caddy, owner: root, group: root, mode: "0700" }
   # Needs the users above; a dry run doesn't create them.
   ignore_errors: "{{ ansible_check_mode }}"
