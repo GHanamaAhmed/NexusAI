@@ -1,4 +1,8 @@
-import { type DialFormat, parseCallWindow } from "@nexus/core"
+import {
+  type DialFormat,
+  parseAllowedNumbers,
+  parseCallWindow,
+} from "@nexus/core"
 
 function required(name: string): string {
   const value = process.env[name]
@@ -31,6 +35,8 @@ export function loadConfig() {
     ariPassword: required("ARI_PASSWORD"),
     /** Nothing is dialed unless this is "true". */
     callsEnabled: process.env.CALLS_ENABLED === "true",
+    /** Calls go only to these numbers; unset allows none. */
+    allowedNumbers: parseAllowedNumbers(process.env.ALLOWED_NUMBERS),
     callWindow: parseCallWindow(process.env.CALL_WINDOW ?? "09:00-20:00"),
     dialFormat,
     limits: {

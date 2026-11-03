@@ -19,7 +19,7 @@ The shared code is in `packages`: `core` (outcomes, call hours, retries, phone n
 
 1. **The platform sends a task** (`POST /v1/tasks`). The API saves it, due 2 minutes later inside call hours.
 2. **The worker asks the platform** whether the call is still wanted. If so, it queues an attempt.
-3. **The voice app dials** within its limits per line, in total and per store, on the registered line with the fewest calls. It dials nothing unless `CALLS_ENABLED` is `true`.
+3. **The voice app dials** within its limits per line, in total and per store, on the registered line with the fewest calls. It dials nothing unless `CALLS_ENABLED` is `true`, and only the numbers in `ALLOWED_NUMBERS` (none when unset, every one with `any`).
 4. **Gemini connects while the phone rings.** When the customer answers, Asterisk sends the call's audio to the voice app over a WebSocket, matched to its call by the channel's id. The voice app waits for the customer's "allo", then the agent greets them.
 5. **The agent confirms the order.** It reads it, listens, looks up a wilaya and commune it hears, and ends with one function: confirm, cancel, call later, change, wrong number, talk to the store, or voicemail. The code checks the agreement: a confirmation and a new place need the customer's yes.
 6. **The voice app writes the result**: the outcome, the customer's words, a confirmed new place, when to call back, what the agent said, and the call's cost. An unanswered call gets its outcome from the network's hang-up cause.

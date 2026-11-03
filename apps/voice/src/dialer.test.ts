@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events"
 import type { ConfirmationOrder } from "@nexus/conversation"
-import { parseCallWindow } from "@nexus/core"
+import { parseAllowedNumbers, parseCallWindow } from "@nexus/core"
 import type { Db, TaskPayload } from "@nexus/db"
 import { createTestDb, resetTestDb } from "@nexus/db/testing"
 import {
@@ -106,11 +106,16 @@ describe("Dialer", () => {
   afterAll(() => db.destroy())
 
   function makeDialer(
-    options: { callsEnabled?: boolean; limits?: Partial<Limits> } = {}
+    options: {
+      callsEnabled?: boolean
+      allowedNumbers?: string
+      limits?: Partial<Limits>
+    } = {}
   ) {
     return new Dialer({
       db,
       callsEnabled: options.callsEnabled ?? true,
+      allowedNumbers: parseAllowedNumbers(options.allowedNumbers ?? "any"),
       window,
       dialFormat: "national",
       limits: { perLine: 1, total: 10, perStore: 3, ...options.limits },
@@ -195,6 +200,40 @@ describe("Dialer", () => {
     expect(await dialer.dialQueued(noon)).toBe(0)
     expect(calls).toEqual([])
     expect((await readAttempt(id!)).status).toBe("queued")
+  })
+
+  it("dials only allowed numbers, and ends the others' tasks without a call", async () => {
+    const [refused, allowed] = await queue("store-a", [
+      "+213551234567",
+      "+213661234567",
+    ])
+    const dialer = makeDialer({ allowedNumbers: "0661234567" })
+    await dialer.updateLines(lines("line01", "line02"), noon)
+    expect(await dialer.dialQueued(noon)).toBe(1)
+    expect(calls.map((call) => call.endpoint)).toEqual([
+      "PJSIP/0661234567@line01",
+    ])
+    expect(await readAttempt(refused!)).toMatchObject({
+      status: "done",
+      outcome: null,
+    })
+    const task = await db
+      .selectFrom("task")
+      .innerJoin("attempt", "attempt.task_id", "task.id")
+      .select("task.status")
+      .where("attempt.id", "=", refused!)
+      .executeTakeFirstOrThrow()
+    expect(task.status).toBe("cancelled")
+    expect((await readAttempt(allowed!)).status).toBe("dialing")
+  })
+
+  it("dials no number when none is allowed", async () => {
+    const [id] = await queue("store-a", ["+213551234567"])
+    const dialer = makeDialer({ allowedNumbers: "" })
+    await dialer.updateLines(lines("line01"), noon)
+    expect(await dialer.dialQueued(noon)).toBe(0)
+    expect(calls).toEqual([])
+    expect((await readAttempt(id!)).status).toBe("done")
   })
 
   it("dials queued attempts on the free registered lines, oldest first", async () => {

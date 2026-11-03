@@ -27,6 +27,7 @@ They live in GitHub, under Settings, Environments, `production`. Change one ther
 | `GEMINI_API_KEY`                                               | secret   | The Gemini API key (paid tier)                                                               |
 | `VOIP_LINES`                                                   | secret   | One phone line per row: `<number> <password>`, the number as the provider spells the account |
 | `HEALTHCHECK_URL`                                              | secret   | The health check's ping address (optional)                                                   |
+| `ALLOWED_NUMBERS`                                              | secret   | The only numbers called, separated by commas (`0XXXXXXXXX`), or `any`; unset calls none      |
 | `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST`          | secret   | CI's key, the server's pinned host key, its address                                          |
 | `PROVIDER_HOST`                                                | variable | The provider's SIP address, `<ip>:<port>`                                                    |
 | `PROVIDER_ROUTE_NAME`                                          | variable | The host name in the provider's routing headers, pinned to `PROVIDER_HOST`'s address         |
@@ -42,6 +43,8 @@ The server makes its own internal passwords (`/srv/nexus/internal.env`: ARI's an
 ### Turning calls on or off
 
 Set `CALLS_ENABLED` to `true` (or `false`) in the `production` environment, then re-run the Deploy workflow. With calls off, the voice app still runs and reports the lines, but takes nothing from the queue: tasks wait in it, and the worker keeps asking the platforms about them.
+
+With calls on, the voice app dials only the numbers in `ALLOWED_NUMBERS`. Any other task ends without a call and without a result, as if the platform no longer wanted it, and the voice log says "not dialed: its number isn't allowed". `any` lifts the limit; unset, it calls nobody. `demo.ts` keeps to the same list.
 
 ## On the server
 
@@ -83,7 +86,7 @@ sudo docker compose -p nexus start api worker voice
 
 ## Test call
 
-`apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome and the tokens. Run it only with the owner's agreement, from a copy of the repository on the server:
+`apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome and the tokens. It refuses a number that isn't in `ALLOWED_NUMBERS` (read from `/srv/nexus/.env`). Run it only with the owner's agreement, from a copy of the repository on the server:
 
 ```sh
 sudo docker run --rm --network host --env-file /srv/nexus/.env --env-file /srv/nexus/internal.env \

@@ -18,6 +18,7 @@ const log = (line: string) => console.log(line)
 const dialer = new Dialer({
   db,
   callsEnabled: config.callsEnabled,
+  allowedNumbers: config.allowedNumbers,
   window: config.callWindow,
   dialFormat: config.dialFormat,
   limits: config.limits,
@@ -107,8 +108,12 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
     })
   })
 }
+const allowed =
+  config.allowedNumbers === "any"
+    ? "any number"
+    : `${config.allowedNumbers.size} allowed numbers only`
 log(
   config.callsEnabled
-    ? "Voice started; calls are on"
+    ? `Voice started; calls are on, to ${allowed}`
     : "Voice started; calls are off (CALLS_ENABLED isn't true)"
 )

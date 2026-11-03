@@ -76,7 +76,7 @@ services:
 
   # Dials queued calls and holds the conversations. Host networking, to reach
   # ARI and the media socket on localhost. It dials nothing unless
-  # CALLS_ENABLED is true.
+  # CALLS_ENABLED is true, and only the numbers in ALLOWED_NUMBERS.
   voice:
     image: ${VOICE_IMAGE:?}
     network_mode: host
@@ -86,6 +86,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
       ARI_PASSWORD: ${ARI_PASSWORD:?}
       CALLS_ENABLED: ${CALLS_ENABLED:-false}
+      ALLOWED_NUMBERS: ${ALLOWED_NUMBERS:-}
       CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
       DIAL_FORMAT: ${DIAL_FORMAT:-national}
       VOICE_AR: ${VOICE_AR:-}

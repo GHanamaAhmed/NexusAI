@@ -1,7 +1,9 @@
 import type { ConfirmationOrder } from "@nexus/conversation"
 import {
+  type AllowedNumbers,
   type CallWindow,
   type DialFormat,
+  isAllowedNumber,
   isWithinCallWindow,
   type Outcome,
   toDialString,
@@ -64,6 +66,8 @@ export class Dialer {
       startCall: StartCall
       /** Nothing is dialed while this is false. */
       callsEnabled: boolean
+      /** The only numbers dialed; any other task ends without a call. */
+      allowedNumbers: AllowedNumbers
       window: CallWindow
       dialFormat: DialFormat
       limits: Limits
@@ -94,7 +98,7 @@ export class Dialer {
 
   /** Starts as many queued calls as the lines and limits allow. */
   async dialQueued(now = new Date()): Promise<number> {
-    const { db, limits, callsEnabled, window } = this.deps
+    const { db, limits, callsEnabled, allowedNumbers, window } = this.deps
     if (!callsEnabled || this.stopping) {
       return 0
     }
@@ -113,11 +117,17 @@ export class Dialer {
       storeCalls.set(run.storeId, (storeCalls.get(run.storeId) ?? 0) + 1)
     }
 
+    const refused: string[] = []
     const chosen = await db.transaction().execute(async (trx) => {
       const queued = await trx
         .selectFrom("attempt")
         .innerJoin("task", "task.id", "attempt.task_id")
-        .select(["attempt.id", "task.client_store_id", "task.payload"])
+        .select([
+          "attempt.id",
+          "attempt.task_id",
+          "task.client_store_id",
+          "task.payload",
+        ])
         .where("attempt.status", "=", "queued")
         .orderBy("attempt.queued_at")
         .limit(free * ROWS_PER_SLOT)
@@ -128,6 +138,22 @@ export class Dialer {
       for (const row of queued) {
         if (picks.length === free) {
           break
+        }
+        // Cancelled like a task the store no longer wants: no call, and no
+        // result sent.
+        if (!isAllowedNumber(row.payload.customer.phone, allowedNumbers)) {
+          await trx
+            .updateTable("attempt")
+            .set({ status: "done", ended_at: now })
+            .where("id", "=", row.id)
+            .execute()
+          await trx
+            .updateTable("task")
+            .set({ status: "cancelled", completed_at: now })
+            .where("id", "=", row.task_id)
+            .execute()
+          refused.push(row.id)
+          continue
         }
         const storeId = row.client_store_id
         if ((storeCalls.get(storeId) ?? 0) >= limits.perStore) {
@@ -151,6 +177,9 @@ export class Dialer {
       return picks
     })
 
+    for (const id of refused) {
+      this.deps.log(`Attempt ${id} not dialed: its number isn't allowed`)
+    }
     for (const { row, line } of chosen) {
       try {
         this.start(row.id, row.client_store_id, row.payload, line)

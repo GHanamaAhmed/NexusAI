@@ -1,6 +1,11 @@
 import { connectGeminiLive } from "@nexus/ai"
 import type { ConfirmationOrder } from "@nexus/conversation"
-import { isAlgerianMobile, toDialString } from "@nexus/core"
+import {
+  isAlgerianMobile,
+  isAllowedNumber,
+  parseAllowedNumbers,
+  toDialString,
+} from "@nexus/core"
 import { Ari } from "./ari.js"
 import { Call } from "./call.js"
 import { startMediaServer } from "./media.js"
@@ -23,6 +28,9 @@ const [phone = "", line = "line01", language = "ar", voice] =
   process.argv.slice(2)
 if (!isAlgerianMobile(phone)) {
   throw new Error("Usage: demo.ts +213XXXXXXXXX [line] [ar|fr] [voice]")
+}
+if (!isAllowedNumber(phone, parseAllowedNumbers(process.env.ALLOWED_NUMBERS))) {
+  throw new Error("demo.ts calls only numbers in ALLOWED_NUMBERS")
 }
 
 const MEDIA_PORT = 8787

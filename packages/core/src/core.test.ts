@@ -3,10 +3,12 @@ import {
   FINAL_OUTCOMES,
   firstAttemptAt,
   isAlgerianMobile,
+  isAllowedNumber,
   isWithinCallWindow,
   nextAttemptAt,
   nextOpening,
   OUTCOMES,
+  parseAllowedNumbers,
   parseCallWindow,
   toDialString,
   unansweredOutcome,
@@ -97,6 +99,38 @@ describe("phone numbers", () => {
 
   it("never spells a number outside Algeria", () => {
     expect(() => toDialString("+33612345678", "national")).toThrow()
+  })
+})
+
+describe("allowed numbers", () => {
+  it("allows none when unset or empty", () => {
+    for (const value of [undefined, "", " "]) {
+      expect(isAllowedNumber("+213551234567", parseAllowedNumbers(value))).toBe(
+        false
+      )
+    }
+  })
+
+  it("allows only the listed numbers, however they're written", () => {
+    const allowed = parseAllowedNumbers(
+      "0551 23 45 67, +213661234567,213771234567"
+    )
+    expect(allowed).toEqual(
+      new Set(["+213551234567", "+213661234567", "+213771234567"])
+    )
+    expect(isAllowedNumber("+213551234567", allowed)).toBe(true)
+    expect(isAllowedNumber("+213551234568", allowed)).toBe(false)
+  })
+
+  it("allows every number only when told any", () => {
+    expect(isAllowedNumber("+213551234567", parseAllowedNumbers("any"))).toBe(
+      true
+    )
+  })
+
+  it("refuses a list with anything but mobiles", () => {
+    expect(() => parseAllowedNumbers("0551234567,021123456")).toThrow()
+    expect(() => parseAllowedNumbers("*")).toThrow()
   })
 })
 
