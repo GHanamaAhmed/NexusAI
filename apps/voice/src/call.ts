@@ -105,6 +105,13 @@ export class Call {
       /** PJSIP/<number>@<line> */
       endpoint: string
       log: (line: string) => void
+      /**
+       * The Asterisk app the call's events go to, and the websocket_client
+       * entry its audio goes to. Test calls use their own, so they run next
+       * to the voice app.
+       */
+      app?: string
+      mediaHost?: string
     }
   ) {
     this.done = new Promise((resolve) => (this.resolve = resolve))
@@ -121,7 +128,7 @@ export class Call {
     try {
       await this.deps.ari.request("POST", "/channels", {
         endpoint: this.deps.endpoint,
-        app: "nexus",
+        app: this.deps.app ?? "nexus",
         channelId: this.callChannel,
         callerId: "NexusAI",
         timeout: String(RING_TIMEOUT_S),
@@ -309,11 +316,11 @@ export class Call {
         channel: this.callChannel,
       })
       await ari.request("POST", "/channels/externalMedia", {
-        app: "nexus",
+        app: this.deps.app ?? "nexus",
         channelId: this.mediaChannel,
         transport: "websocket",
         encapsulation: "none",
-        external_host: "nexus_media",
+        external_host: this.deps.mediaHost ?? "nexus_media",
         format: "slin24",
         transport_data: "f(json)",
       })

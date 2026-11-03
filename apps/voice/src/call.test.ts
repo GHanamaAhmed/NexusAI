@@ -314,3 +314,32 @@ describe("Call", () => {
     await vi.waitFor(() => expect(sessions[0]!.closed).toBe(true))
   })
 })
+
+describe("Call for a test line", () => {
+  it("sends its events and audio where it's told", async () => {
+    const queries: Record<string, string>[] = []
+    const call = new Call({
+      ari: {
+        request: async (_method, _path, query = {}) => {
+          queries.push(query)
+          return null
+        },
+      },
+      connect: async () => new FakeSession(),
+      order,
+      endpoint: "PJSIP/0551234567@line01",
+      log: () => {},
+      app: "nexus-test",
+      mediaHost: "nexus_media_test",
+    })
+    await call.dial()
+    const channelId = queries[0]!.channelId!
+    await call.onEvent({ type: "StasisStart", channel: { id: channelId } })
+
+    expect(queries[0]).toMatchObject({ app: "nexus-test" })
+    expect(queries.at(-1)).toMatchObject({
+      app: "nexus-test",
+      external_host: "nexus_media_test",
+    })
+  })
+})

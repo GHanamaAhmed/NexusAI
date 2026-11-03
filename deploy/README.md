@@ -86,9 +86,33 @@ sudo docker compose -p nexus start api worker voice
 
 ## Test call
 
-`apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome and the tokens. It refuses a number that isn't in `ALLOWED_NUMBERS` (read from `/srv/nexus/.env`). Run it only with the owner's agreement, from a copy of the repository on the server:
+`apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome and the tokens. It refuses a number that isn't in `ALLOWED_NUMBERS` (read from `/srv/nexus/.env`). Test calls run next to the voice app, with their own Asterisk app (`nexus-test`) and audio port (8788, `nexus_media_test` in `websocket_client.conf`), so nothing is stopped and the health check stays green. Use a line the voice app isn't calling on. Run it only with the owner's agreement, from a copy of the repository on the server:
 
 ```sh
 sudo docker run --rm --network host --env-file /srv/nexus/.env --env-file /srv/nexus/internal.env \
   -v <copy>:/work -w /work/apps/voice node:24-slim ./node_modules/.bin/tsx src/demo.ts +213XXXXXXXXX line01 ar
 ```
+
+## Volunteer calls
+
+The volunteer test measures how well the calls understand people answering in their own words. Each volunteer gets a card of scenarios, and `apps/voice/src/volunteer-calls.ts` calls them once per scenario, in the card's order, with a made-up order each time. A call is right when its outcome is one the scenario expects.
+
+1. Copy `apps/voice/volunteer-card.example.json` to `/srv/nexus/volunteers/<label>.json` (root only) and fill in the volunteer's number, the name the call greets and the language. The hints in `say` are for the volunteer, who reads the card before the calls; the call never sees them.
+2. The volunteer's number must be in `ALLOWED_NUMBERS`, and only the owner adds it.
+3. Call them. A call comes about a minute after the last one ends (`PAUSE_SECONDS`). What was said stays off the screen unless `SHOW_WORDS=1`:
+
+   ```sh
+   sudo docker run --rm --network host --env-file /srv/nexus/.env --env-file /srv/nexus/internal.env \
+     -v <copy>:/work -v /srv/nexus/volunteers:/volunteers -w /work/apps/voice node:24-slim \
+     ./node_modules/.bin/tsx src/volunteer-calls.ts /volunteers/V1.json line10
+   ```
+
+4. Each result goes into `/srv/nexus/volunteers/<label>.results.json` as soon as the call ends. A scenario nobody answered is called again by number (`... V1.json line10 3,7`); only the first answered call of each scenario counts, so a second try never hides a wrong answer.
+5. Score everyone together against the pass mark (at least 90% right, and a yes taken for a no, or the reverse, in at most 1% of calls):
+
+   ```sh
+   sudo docker run --rm -v <copy>:/work -v /srv/nexus/volunteers:/volunteers -w /work/apps/voice node:24-slim \
+     sh -c './node_modules/.bin/tsx src/volunteer-score.ts /volunteers/*.results.json'
+   ```
+
+   It prints a table of numbers only, for `docs/benchmark.md`. Delete the cards and results 30 days after scoring, or sooner if a volunteer asks.

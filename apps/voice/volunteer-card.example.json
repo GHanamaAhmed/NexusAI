@@ -1,0 +1,68 @@
+{
+  "volunteer": "V1",
+  "phone": "+213XXXXXXXXX",
+  "name": "سارة",
+  "language": "ar",
+  "scenarios": [
+    {
+      "intent": "confirm",
+      "expect": ["confirmed"],
+      "say": "قول إيه، الطلبية صحيحة."
+    },
+    {
+      "intent": "confirm",
+      "expect": ["confirmed"],
+      "say": "قول إيه، وسقسي وقتاش توصل."
+    },
+    {
+      "intent": "confirm",
+      "expect": ["confirmed"],
+      "say": "جاوب بالفرنسية كيما تهدر عادة: oui c'est bon."
+    },
+    {
+      "intent": "cancel",
+      "expect": ["cancelled"],
+      "say": "قول ما راكش حاب الطلبية، وإذا عاود سقساك أكّد."
+    },
+    {
+      "intent": "cancel",
+      "expect": ["cancelled"],
+      "say": "قول بدلت رايك، شريتها من بلاصة أخرى."
+    },
+    {
+      "intent": "call_later",
+      "expect": ["call_later"],
+      "say": "قول راك خدام، يعيطلك من بعد الخمسة."
+    },
+    {
+      "intent": "call_later",
+      "expect": ["call_later"],
+      "say": "قول ما تقدرش تهدر دروك، يعيطلك غدوة الصباح."
+    },
+    {
+      "intent": "change_place",
+      "expect": ["request_change"],
+      "say": "قول حاب توصلك لبلدية أخرى في نفس الولاية، وسمّيها."
+    },
+    {
+      "intent": "change_place",
+      "expect": ["request_change"],
+      "say": "قول راك في ولاية أخرى، وسمّي الولاية والبلدية."
+    },
+    {
+      "intent": "wrong_number",
+      "expect": ["wrong_number"],
+      "say": "قول ما طلبت والو، راهو غالط في النمرة."
+    },
+    {
+      "intent": "talk_to_store",
+      "expect": ["talk_to_store"],
+      "say": "قول حاب تهدر مع واحد من المحل على المقاس قبل ما تأكد."
+    },
+    {
+      "intent": "unclear",
+      "expect": ["talk_to_store", "call_later"],
+      "say": "تردد: مم... ما نعرفش، نشوف... وما تقولش إيه ولا لا."
+    }
+  ]
+}
