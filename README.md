@@ -6,8 +6,7 @@
 </p>
 
 <p align="center">
-  <strong>AI phone confirmations and store designs, as a service for commerce platforms.</strong><br>
-  Built for Algeria: Darija and French on the phone, the 69 wilayas, cash on delivery.
+  <strong>AI services for platforms: phone agents that confirm orders, and builders that design stores.</strong>
 </p>
 
 <p align="center">
@@ -24,12 +23,12 @@
 
 ---
 
-NexusAI is a service that commerce platforms call over HTTPS to hand work to AI. Each platform has its own account, keys and webhook secret, and its own settings for how calls sound. NexusAI keeps only what the work needs, for as long as it needs it.
+NexusAI is a service that platforms call over HTTPS to hand work to AI. Each platform has its own account, keys and webhook secret, and its own settings for how calls sound. NexusAI keeps only what the work needs, for as long as it needs it.
 
 ## Features
 
-- **Order confirmation calls.** NexusAI phones the customer of a cash-on-delivery order, talks with them in Algerian Darija or French, and sends the platform what they decided: confirmed, cancelled, a new delivery place, call me later, and more.
-- **Checks the code enforces.** A confirmation or a change of place needs the customer's own yes; a new place must be one of the 1,541 communes the agent looked up and said back.
+- **Order confirmation calls.** An AI agent phones the customer, talks through their order, and sends the platform what they decided: confirmed, cancelled, a new delivery place, call me later, and more.
+- **Checks the code enforces.** A confirmation or a change of place needs the customer's own yes, and a new place must be one the agent looked up and said back.
 - **Four voice models behind one interface,** chosen per account: Gemini 3.8 Live, GPT Realtime 2.1 and its mini, and GPT-Live. Each call records its model, its answered seconds and its cost.
 - **Store designs.** A platform sends the parts a page may use as a JSON Schema, with a brief and photos, and gets back a design that matches it, with generated banners. In tests a design took 25 to 60 seconds and cost under 11 US cents.
 - **Built to be trusted with calls.** Nothing is dialed unless calls are switched on, and only numbers on an allow list; every result is signed; tasks are deleted after 30 days and no audio is kept.
@@ -51,6 +50,7 @@ NexusAI is a service that commerce platforms call over HTTPS to hand work to AI.
 ## Contents
 
 - [How it works](#how-it-works)
+- [Current coverage](#current-coverage)
 - [Repository layout](#repository-layout)
 - [Getting started](#getting-started)
 - [Configuration](#configuration)
@@ -98,10 +98,10 @@ flowchart TB
 
 ### A confirmation call
 
-1. The platform sends a task (`POST /v1/tasks`). It is due two minutes later, inside call hours (09:00 to 20:00, Algiers time).
+1. The platform sends a task (`POST /v1/tasks`). It is due two minutes later, inside call hours.
 2. Before each call, the worker asks the platform whether the call is still wanted, so a call never follows a confirmation made meanwhile.
 3. The voice app dials through Asterisk on the least busy registered line. It dials nothing unless calls are switched on, and only numbers on an allow list.
-4. The voice model holds the conversation. It reads the order, listens, looks up any wilaya and commune it hears among the 69 wilayas and 1,541 communes, and ends with one outcome. The code checks the agreement: a confirmation or a new place needs the customer's own yes.
+4. The voice model holds the conversation. It reads the order, listens, looks up any delivery place it hears, and ends with one outcome. The code checks the agreement: a confirmation or a new place needs the customer's own yes.
 5. The worker sends the result to the platform, signed, and schedules another try when nobody answered (three tries at most).
 
 Four voice models are supported behind one interface, chosen per account: `gemini-3.8-live` (the default), `gpt-realtime-2.1`, `gpt-realtime-2.1-mini` and `gpt-live-1`. Each attempt records its model, how long it was answered and what it cost.
@@ -115,6 +115,10 @@ Four voice models are supported behind one interface, chosen per account: `gemin
 
 NexusAI knows nothing about a platform's page sections beyond the schema it receives, so any platform can use it.
 
+## Current coverage
+
+Phone calls currently run in Algeria: Algerian mobile numbers and phone lines, Darija and French, the country's wilayas and communes, totals in dinars, and call hours in Algiers time. Designs are written in Arabic or French. Accounts, keys, signed results, the task queue and the model catalogues aren't tied to a country; another country needs its own lines, number rules, places and languages.
+
 ## Repository layout
 
 | Path                    | What it holds                                                                                        |
@@ -126,7 +130,7 @@ NexusAI knows nothing about a platform's page sections beyond the schema it rece
 | `packages/conversation` | The agent's instruction and its functions                                                            |
 | `packages/core`         | Outcomes, call hours, retries and phone numbers                                                      |
 | `packages/db`           | The database schema and migrations (Kysely)                                                          |
-| `packages/places`       | Algeria's 69 wilayas and 1,541 communes, with fuzzy matching in Arabic and French                    |
+| `packages/places`       | The delivery places the agent can look up, with fuzzy matching                                       |
 | `packages/webhooks`     | Signing and delivering results                                                                       |
 | `deploy`                | The production Compose file, Asterisk's configuration and the release scripts                        |
 | `infra/ansible`         | The playbook that prepares the server                                                                |
@@ -211,7 +215,7 @@ NexusAI calls the platform back twice per call: a check before dialing (`check_u
 ## Security and privacy
 
 - **Keys:** stored hashed, per account, and revocable from the CLI. Webhook payloads are signed with each account's own secret.
-- **Calls:** off unless `CALLS_ENABLED` is `true`, and limited to `ALLOWED_NUMBERS`. Only Algerian mobile numbers are accepted.
+- **Calls:** off unless `CALLS_ENABLED` is `true`, and limited to `ALLOWED_NUMBERS`.
 - **Data kept:** a task holds the store's name, the customer's name, phone and language, the items, the total and the delivery place. Tasks are deleted after 30 days, designs and their images after 7. No call audio is stored, and logs hold no phone numbers or conversation.
 - **Providers:** during a call the customer's voice goes to the active model's provider (Google or OpenAI). Design briefs and photos go to Meta.
 - **Releases:** images are scanned, signed in CI without a key and verified on the server before they run. The server accepts SSH keys only, behind a firewall and fail2ban.
