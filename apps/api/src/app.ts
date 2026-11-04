@@ -6,6 +6,7 @@ import { sql } from "kysely"
 import { z } from "zod"
 import { accountForKey } from "./keys.js"
 import { createTask, taskInputSchema } from "./tasks.js"
+import { registerVoiceRoutes } from "./voice-settings.js"
 
 const IdParam = z.object({ id: z.uuid() })
 const IdempotencyKey = z.string().min(1).max(200)
@@ -14,6 +15,8 @@ export async function buildApp(options: {
   db: Db
   callWindow: CallWindow
   allowHttpCallbacks: boolean
+  /** Whose API keys the voice app has, besides Gemini's. */
+  voiceProviders?: string[]
 }) {
   const { db, callWindow } = options
   const TaskInput = taskInputSchema(options.allowHttpCallbacks)
@@ -30,6 +33,12 @@ export async function buildApp(options: {
     const [scheme, key] = (request.headers.authorization ?? "").split(" ")
     return scheme === "Bearer" && key ? accountForKey(db, key) : null
   }
+
+  registerVoiceRoutes(app, {
+    db,
+    account,
+    providers: new Set(["gemini", ...(options.voiceProviders ?? [])]),
+  })
 
   app.get("/health", async (_request, reply) => {
     try {

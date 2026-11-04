@@ -132,6 +132,13 @@ export interface LineStatusTable {
   updated_at: Timestamp
 }
 
+export interface VoiceSettingsTable {
+  account_id: string
+  settings: JSONColumnType<Record<string, unknown>>
+  version: ColumnType<number, number | undefined, number>
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>
+}
+
 export interface Database {
   account: AccountTable
   api_key: ApiKeyTable
@@ -140,6 +147,7 @@ export interface Database {
   attempt: AttemptTable
   webhook_delivery: WebhookDeliveryTable
   line_status: LineStatusTable
+  voice_settings: VoiceSettingsTable
 }
 
 export type Task = Selectable<TaskTable>

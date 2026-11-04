@@ -29,7 +29,7 @@ Two Algerian mobile networks behaved the same way, so the limit is in the provid
 
 ## Voices
 
-Chosen by listening on real calls: `Callirrhoe` for Darija, `Kore` for French (`VOICE_AR`, `VOICE_FR`). Totals are said in words, spelled by the code ("ستة آلاف وخمسمية دينار"), never left to the model.
+Chosen by listening on real calls: `Callirrhoe` for Darija, `Kore` for French, as the defaults of the account's voice settings (`GET /v1/voice/settings`). Totals are said in words, spelled by the code ("ستة آلاف وخمسمية دينار"), never left to the model.
 
 On phone calls the model's pitch drifts, more than in a text-only test. `Aoede` sits near 170 Hz, so its dips below 160 Hz sounded like a man. `Callirrhoe` sits near 200 Hz and stayed between 194 and 218 Hz on a full call. `apps/voice/src/voice-test.ts` measures how steady each voice is.
 

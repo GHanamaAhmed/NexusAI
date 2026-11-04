@@ -1,4 +1,4 @@
-import { connectGeminiLive } from "@nexus/ai"
+import { connectGeminiLive, modelInfo } from "@nexus/ai"
 import {
   answerLookup,
   buildInstruction,
@@ -156,7 +156,7 @@ async function run(scenario: Scenario): Promise<Result> {
   const result: Result = { calls: [], lookups: [] }
   const session = await connectGeminiLive({
     apiKey: apiKey!,
-    voice: process.env.VOICE_AR ?? "Callirrhoe",
+    voice: modelInfo("gemini-3.8-live").defaultVoices.ar,
     instruction: buildInstruction(order, new Date()),
     tools: CONFIRMATION_TOOLS,
   })

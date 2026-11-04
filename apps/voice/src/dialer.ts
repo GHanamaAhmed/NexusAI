@@ -1,3 +1,4 @@
+import { modelSettings, type VoiceSettings } from "@nexus/ai"
 import type { ConfirmationOrder } from "@nexus/conversation"
 import {
   type AllowedNumbers,
@@ -36,7 +37,8 @@ export type ActiveCall = {
 
 export type StartCall = (
   order: ConfirmationOrder,
-  endpoint: string
+  endpoint: string,
+  settings: VoiceSettings
 ) => ActiveCall
 
 export type Limits = { perLine: number; total: number; perStore: number }
@@ -71,8 +73,8 @@ export class Dialer {
       window: CallWindow
       dialFormat: DialFormat
       limits: Limits
-      /** The voice model calls use, recorded with each call's cost. */
-      model: string
+      /** The voice settings a call of this account runs with. */
+      settingsFor: (accountId: string) => Promise<VoiceSettings>
       log: (line: string) => void
     }
   ) {}
@@ -127,6 +129,7 @@ export class Dialer {
         .select([
           "attempt.id",
           "attempt.task_id",
+          "task.account_id",
           "task.client_store_id",
           "task.payload",
         ])
@@ -184,7 +187,8 @@ export class Dialer {
     }
     for (const { row, line } of chosen) {
       try {
-        this.start(row.id, row.client_store_id, row.payload, line)
+        const settings = await this.deps.settingsFor(row.account_id)
+        this.start(row.id, row.client_store_id, row.payload, line, settings)
       } catch (error) {
         // toDialString refuses anything but an Algerian mobile.
         this.deps.log(`Attempt ${row.id} not dialed: ${String(error)}`)
@@ -206,7 +210,8 @@ export class Dialer {
       customer: ConfirmationOrder["customer"] & { phone: string }
       order: ConfirmationOrder["order"]
     },
-    line: string
+    line: string,
+    settings: VoiceSettings
   ) {
     const { store, customer, order } = payload
     const call = this.deps.startCall(
@@ -219,10 +224,11 @@ export class Dialer {
           delivery: order.delivery,
         },
       },
-      `PJSIP/${toDialString(customer.phone, this.deps.dialFormat)}@${line}`
+      `PJSIP/${toDialString(customer.phone, this.deps.dialFormat)}@${line}`,
+      settings
     )
     const recorded = call.done
-      .then((result) => this.record(attemptId, result))
+      .then((result) => this.record(attemptId, result, settings))
       .catch((error: unknown) =>
         this.deps.log(`Recording attempt ${attemptId}: ${String(error)}`)
       )
@@ -236,7 +242,12 @@ export class Dialer {
     })
   }
 
-  private async record(attemptId: string, result: CallResult) {
+  private async record(
+    attemptId: string,
+    result: CallResult,
+    settings: VoiceSettings
+  ) {
+    const model = settings.active_model
     const outcome: Outcome =
       result.outcome ??
       (result.answeredAt ? "no_input" : unansweredOutcome(result.cause))
@@ -258,12 +269,16 @@ export class Dialer {
               result.agentSaid.map((text) => ({ who: "agent", text }))
             )
           : null,
-        cost: result.usage.promptTokens
-          ? JSON.stringify({
-              ...callCost(result.usage),
-              model: this.deps.model,
-            })
-          : null,
+        cost:
+          result.usage.promptTokens || result.usage.seconds
+            ? JSON.stringify({
+                ...callCost(
+                  result.usage,
+                  modelSettings(settings, model).prices
+                ),
+                model,
+              })
+            : null,
       })
       .where("id", "=", attemptId)
       .execute()

@@ -54,6 +54,8 @@ services:
     environment:
       DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
       CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+      # Which models can be chosen; the API doesn't hold the key itself.
+      VOICE_PROVIDERS: ${OPENAI_API_KEY:+openai}
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,8 +91,7 @@ services:
       ALLOWED_NUMBERS: ${ALLOWED_NUMBERS:-}
       CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
       DIAL_FORMAT: ${DIAL_FORMAT:-national}
-      VOICE_AR: ${VOICE_AR:-}
-      VOICE_FR: ${VOICE_FR:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       MAX_CALLS_PER_LINE: ${MAX_CALLS_PER_LINE:-}
       MAX_CALLS_TOTAL: ${MAX_CALLS_TOTAL:-}
       MAX_CALLS_PER_STORE: ${MAX_CALLS_PER_STORE:-}
@@ -99,8 +100,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Calls in progress finish before it stops (150 s at most).
-    stop_grace_period: 3m
+    # Calls in progress finish before it stops: 10 minutes at most, the longest
+    # an admin can set, plus the ringing and the goodbye.
+    stop_grace_period: 12m
     mem_limit: 384m
     logging: *logging
 

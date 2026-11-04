@@ -5,11 +5,13 @@ import {
   buildInstruction,
   CONFIRMATION_TOOLS,
   type ConfirmationOrder,
+  type InstructionStyle,
   OPENING,
   outcomeForTool,
   type PlaceChange,
   placeChange,
   refuseOutcome,
+  TIME_UP,
 } from "@nexus/conversation"
 import type { Outcome } from "@nexus/core"
 import type { Ari, AriEvent } from "./ari.js"
@@ -18,7 +20,6 @@ import type { MediaCall } from "./media.js"
 
 const AUDIO_RATE = 24_000
 const RING_TIMEOUT_S = 40
-const MAX_CALL_MS = 150_000
 /**
  * Most people say "allo" first. Greeting at a fixed moment often collided with
  * it: the model stopped, and the customer waited several seconds in silence.
@@ -61,8 +62,8 @@ export type Connect = (options: {
 type Session = Promise<VoiceSession | null>
 
 /**
- * One confirmation call: dials, holds the conversation and hangs up. Gemini is
- * connected while the phone rings, so the greeting doesn't wait for it.
+ * One confirmation call: dials, holds the conversation and hangs up. The model
+ * is connected while the phone rings, so the greeting doesn't wait for it.
  */
 export class Call {
   readonly done: Promise<CallResult>
@@ -85,6 +86,7 @@ export class Call {
   private readonly lookups: Record<string, unknown>[] = []
   private hangingUp = false
   private ended = false
+  private timeUp = false
   private lastCustomerVoiceAt = 0
   private agentTurnAudio: Buffer[] = []
   private readonly usage: Usage = {
@@ -93,6 +95,8 @@ export class Call {
     promptAudioTokens: 0,
     cachedTokens: 0,
     responseAudioTokens: 0,
+    cachedAudioTokens: 0,
+    seconds: 0,
   }
   private readonly agentSaid: string[] = []
   private readonly timers: NodeJS.Timeout[] = []
@@ -102,6 +106,10 @@ export class Call {
       ari: Pick<Ari, "request">
       connect: Connect
       order: ConfirmationOrder
+      /** What an admin changed in how calls sound. */
+      style?: InstructionStyle
+      /** From the answer to the goodbye. */
+      maxCallSeconds: number
       /** PJSIP/<number>@<line> */
       endpoint: string
       log: (line: string) => void
@@ -122,7 +130,7 @@ export class Call {
     this.deps.log(`${seconds.padStart(5)}s ${line}`)
   }
 
-  /** Starts connecting to Gemini, then dials. */
+  /** Starts connecting to the model, then dials. */
   async dial() {
     this.session = this.connect()
     try {
@@ -139,23 +147,36 @@ export class Call {
     }
     // The line, not the number: logs hold no customer's number.
     this.log(`calling on ${this.deps.endpoint.split("@")[1]}`)
+  }
+
+  /** Lets the model say goodbye; a call with nobody to say it to just ends. */
+  private async endAtTimeLimit() {
+    this.log("time limit")
+    const session = this.greeted && !this.outcome ? await this.session : null
+    if (!session) {
+      void this.hangup()
+      return
+    }
+    this.timeUp = true
+    session.instruct(TIME_UP)
     this.timers.push(
-      setTimeout(() => {
-        this.log("time limit")
-        void this.hangup()
-      }, MAX_CALL_MS)
+      setTimeout(() => this.hangupAfterGoodbye(), GOODBYE_DEADLINE_MS)
     )
   }
 
   private connect(): Session {
     const session: Session = this.deps
       .connect({
-        instruction: buildInstruction(this.deps.order, new Date()),
+        instruction: buildInstruction(
+          this.deps.order,
+          new Date(),
+          this.deps.style
+        ),
         tools: CONFIRMATION_TOOLS,
         onClose: (reason) => this.closed(session, reason),
       })
       .catch((error: unknown) => {
-        this.log(`Gemini: could not connect: ${String(error)}`)
+        this.log(`The model could not connect: ${String(error)}`)
         return null
       })
     return session
@@ -165,7 +186,7 @@ export class Call {
     if (this.ended || session !== this.session) {
       return
     }
-    this.log(`Gemini closed: ${reason}`)
+    this.log(`The model closed: ${reason}`)
     if (!this.media) {
       // Closed while the phone rang: connect again when they answer.
       this.session = null
@@ -204,8 +225,8 @@ export class Call {
       }
     })
     session.onUsage((usage) => {
-      for (const key of Object.keys(this.usage) as (keyof Usage)[]) {
-        this.usage[key] += usage[key]
+      for (const key of Object.keys(usage) as (keyof Usage)[]) {
+        this.usage[key] = (this.usage[key] ?? 0) + (usage[key] ?? 0)
       }
       this.log(
         `(usage report: prompt ${usage.promptTokens}, response ${usage.responseTokens})`
@@ -218,7 +239,7 @@ export class Call {
       if (pitch) {
         this.log(`(agent voice pitch ${pitch} Hz)`)
       }
-      if (this.outcome) {
+      if (this.outcome || this.timeUp) {
         this.hangupAfterGoodbye()
       }
     })
@@ -237,9 +258,9 @@ export class Call {
         this.lastCustomerVoiceAt = Date.now()
       }
       // The model hears the customer from the greeting on, so an "allo" can't
-      // cut it off. Once the answer is in, the model only says goodbye;
-      // nothing it hears can start the conversation again.
-      if (this.greeted && !this.outcome) {
+      // cut it off. Once the answer is in or time is up, the model only says
+      // goodbye; nothing it hears can start the conversation again.
+      if (this.greeted && !this.outcome && !this.timeUp) {
         session.sendAudio(pcm, AUDIO_RATE)
       }
     }
@@ -308,6 +329,12 @@ export class Call {
     if (event.type === "StasisStart" && channel === this.callChannel) {
       this.answeredAt = Date.now()
       this.log("answered")
+      this.timers.push(
+        setTimeout(
+          () => void this.endAtTimeLimit(),
+          this.deps.maxCallSeconds * 1000
+        )
+      )
       await ari.request("POST", "/bridges", {
         type: "mixing",
         bridgeId: this.bridgeId,

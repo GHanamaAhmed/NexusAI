@@ -25,6 +25,7 @@ They live in GitHub, under Settings, Environments, `production`. Change one ther
 | Name                                                           | Kind     | What it is                                                                                   |
 | -------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
 | `GEMINI_API_KEY`                                               | secret   | The Gemini API key (paid tier)                                                               |
+| `OPENAI_API_KEY`                                               | secret   | Optional. OpenAI's API key; without it, OpenAI's voice models can't be chosen                |
 | `VOIP_LINES`                                                   | secret   | One phone line per row: `<number> <password>`, the number as the provider spells the account |
 | `HEALTHCHECK_URL`                                              | secret   | The health check's ping address (optional)                                                   |
 | `ALLOWED_NUMBERS`                                              | secret   | The only numbers called, separated by commas (`0XXXXXXXXX`), or `any`; unset calls none      |
@@ -32,7 +33,6 @@ They live in GitHub, under Settings, Environments, `production`. Change one ther
 | `PROVIDER_HOST`                                                | variable | The provider's SIP address, `<ip>:<port>`                                                    |
 | `PROVIDER_ROUTE_NAME`                                          | variable | The host name in the provider's routing headers, pinned to `PROVIDER_HOST`'s address         |
 | `DIAL_FORMAT`                                                  | variable | `national` (`0XXXXXXXXX`) or `international` (`213XXXXXXXXX`)                                |
-| `VOICE_AR`, `VOICE_FR`                                         | variable | The Gemini voices for Darija and French                                                      |
 | `PUBLIC_HOST`                                                  | variable | The API's public host name; Caddy gets its certificate for it                                |
 | `CALLS_ENABLED`                                                | variable | `true` lets the voice app dial; anything else, or unset, dials nothing                       |
 | `CALL_WINDOW`                                                  | variable | Call hours in Algiers time, `09:00-20:00` when unset                                         |

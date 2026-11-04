@@ -127,7 +127,23 @@ async function callResultsDown(db: Kysely<unknown>) {
   `.execute(db)
 }
 
+async function voiceSettingsUp(db: Kysely<unknown>) {
+  await sql`
+    CREATE TABLE voice_settings (
+      account_id uuid PRIMARY KEY REFERENCES account ON DELETE CASCADE,
+      settings jsonb NOT NULL,
+      version integer NOT NULL DEFAULT 1,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `.execute(db)
+}
+
+async function voiceSettingsDown(db: Kysely<unknown>) {
+  await sql`DROP TABLE voice_settings`.execute(db)
+}
+
 export const migrations: Record<string, Migration> = {
   "0001_initial": { up: initialUp, down: initialDown },
   "0002_call_results": { up: callResultsUp, down: callResultsDown },
+  "0003_voice_settings": { up: voiceSettingsUp, down: voiceSettingsDown },
 }

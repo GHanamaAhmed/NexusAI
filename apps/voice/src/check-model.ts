@@ -1,4 +1,4 @@
-import { connectGeminiLive } from "@nexus/ai"
+import { connectGeminiLive, DEFAULT_LIVE_MODEL } from "@nexus/ai"
 import {
   buildInstruction,
   CONFIRMATION_TOOLS,
@@ -6,10 +6,11 @@ import {
 } from "@nexus/conversation"
 
 /**
- * Checks that a Live model accepts our session and speaks, with no phone call:
- *   LIVE_MODEL=<model> tsx src/check-model.ts
+ * Checks that a Gemini Live model accepts our session and speaks, with no phone
+ * call:
+ *   tsx src/check-model.ts [model]
  */
-const model = process.env.LIVE_MODEL ?? "gemini-3.8-live"
+const model = process.argv[2] ?? DEFAULT_LIVE_MODEL
 const apiKey = process.env.GEMINI_API_KEY
 if (!apiKey) {
   throw new Error("Set GEMINI_API_KEY")

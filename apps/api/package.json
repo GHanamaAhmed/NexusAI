@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.1",
+    "@nexus/ai": "workspace:*",
+    "@nexus/conversation": "workspace:*",
     "@nexus/core": "workspace:*",
     "@nexus/db": "workspace:*",
     "fastify": "^5.12.7",

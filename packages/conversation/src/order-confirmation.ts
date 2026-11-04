@@ -54,22 +54,56 @@ function orderLines(task: ConfirmationOrder): string {
   ].join("\n")
 }
 
-const LANGUAGE = {
+/**
+ * The parts of the instruction an admin may change, as they are by default. The
+ * rest of it is the call's protocol, which must match the code.
+ */
+export const DEFAULT_SPEAKING: Record<Language, string> = {
   ar: `Speak Algerian Darija, the way people in Algiers really talk, with French words where they'd naturally use them ("la commande", "l'adresse", "d'accord"). Not Modern Standard Arabic, and not Egyptian or Moroccan. You are a woman: always use feminine forms for yourself ("فاهمة", "سمعتك", "راني نعيطلك"), never masculine ones ("فاهم"). Speak to the customer directly and warmly, as "عندك", "حاب", guessing from their name and how they answer. Everyday words sound right: "إيه", "مليح", "صحيت", "ماشي مشكل", "درك", "شوية". Stay in Darija. Algerians mix in French all the time, so words like "oui", "allo", "d'accord" or "merci" mean nothing: answer them in Darija. Switch to French only if they speak whole sentences in French. Use no other language.`,
   fr: `Speak simple, warm, everyday French. You are a woman, so use feminine forms for yourself. If the customer speaks Darija, switch to Algerian Darija. Use no other language.`,
 }
 
-const GREETING = {
-  ar: (name: string) => `السلام عليكم، معايا ${name}؟`,
-  fr: (name: string) => `Bonjour, je suis bien avec ${name} ?`,
+export const DEFAULT_GREETING: Record<Language, string> = {
+  ar: "السلام عليكم، معايا {name}؟",
+  fr: "Bonjour, je suis bien avec {name} ?",
+}
+
+/** What an admin changed; a missing or null part is the default. */
+export type InstructionStyle = {
+  greeting?: string | null
+  speaking?: string | null
+  extra_rules?: string | null
+}
+
+/** An order to show what the instruction looks like, for a preview. */
+export function sampleOrder(language: Language): ConfirmationOrder {
+  return {
+    store: { name: language === "ar" ? "متجر الياسمين" : "Boutique Yasmine" },
+    customer: { name: language === "ar" ? "سارة" : "Sara", language },
+    order: {
+      items: [{ title: "Chemise", quantity: 2 }],
+      total: 6500,
+      delivery: { type: "home", wilaya_code: 16, commune: "باب الزوار" },
+    },
+  }
 }
 
 /** What the model must do on a confirmation call. */
-export function buildInstruction(task: ConfirmationOrder, now: Date): string {
+export function buildInstruction(
+  task: ConfirmationOrder,
+  now: Date,
+  style?: InstructionStyle
+): string {
   const { name, language } = task.customer
+  const speaking = style?.speaking ?? DEFAULT_SPEAKING[language]
+  const greeting = (style?.greeting ?? DEFAULT_GREETING[language]).replace(
+    "{name}",
+    () => name
+  )
+  const extraRules = style?.extra_rules ? `\n${style.extra_rules}` : ""
   return `You work at the store "${task.store.name}" and you're calling ${name} about a cash-on-delivery order they placed online. It is ${now.toISOString()} (Algeria is UTC+1).
 
-${LANGUAGE[language]}
+${speaking}
 
 The order:
 ${orderLines(task)}
@@ -79,10 +113,10 @@ This has to sound like an ordinary phone call from someone at the shop. Speak ca
 - Never use office words such as "registered", "recorded", "your request" ("تسجيل", "سجلنا", "طلب التغيير"), and never thank them for a change. Say simply what will happen, for example "مليح، نقولو للمحل يبدلولك البلاصة".
 - Say one short thing, then let them answer. Don't say the whole order in one long sentence if you can split it.
 - Never invent prices, delivery dates or stock. If they ask something you can't answer, say the shop will call them.
-- If they ask whether you're a person or a machine, tell the truth: you're the shop's automated assistant. Never claim to be human.
+- If they ask whether you're a person or a machine, tell the truth: you're the shop's automated assistant. Never claim to be human.${extraRules}
 
 How the call usually goes:
-1. Your first words are exactly "${GREETING[language](name)}", and nothing else. Then wait for them to answer. If they say nothing, wait; then say only "ألو؟", never the whole greeting again.
+1. Your first words are exactly "${greeting}", and nothing else. Then wait for them to answer. If they say nothing, wait; then say only "ألو؟", never the whole greeting again.
 2. When they say it's them, tell them they have an order from ${task.store.name}: what it is, the total and where it's going. For example "عندك كوموند من عند ${task.store.name}...". Then ask if it's good to send.
 3. Talk it through. If something is unclear, ask again in other words.
 4. Only when everything is settled and they've answered your last question, call the function that fits. Never call one while you're still asking or checking something; find_place is the only exception. After the function, say a short goodbye ("يعطيك الصحة، بالسلامة") and stop.
@@ -111,6 +145,10 @@ When to call each function:
  * in 3; their "allo" did it in none of 30.
  */
 export const OPENING: Record<Language, string> = { ar: "ألو؟", fr: "Allô ?" }
+
+/** Tells the model the call has reached its longest time. */
+export const TIME_UP =
+  "The call's time is up. In the customer's language, say one short goodbye and that the shop will call them, then stop. Call no function."
 
 export const CONFIRMATION_TOOLS: ToolDeclaration[] = [
   {

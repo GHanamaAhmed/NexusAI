@@ -67,6 +67,10 @@ class GeminiLiveSession implements VoiceSession {
     })
   }
 
+  instruct(text: string) {
+    this.start(text)
+  }
+
   close() {
     this.session?.close()
   }
@@ -144,6 +148,7 @@ export async function connectGeminiLive(options: {
   voice: string
   instruction: string
   tools: ToolDeclaration[]
+  silenceMs?: number
   onClose?: (reason: string) => void
 }): Promise<VoiceSession> {
   const live = new GeminiLiveSession()
@@ -170,7 +175,7 @@ export async function connectGeminiLive(options: {
       outputAudioTranscription: {},
       realtimeInputConfig: {
         automaticActivityDetection: {
-          silenceDurationMs: SILENCE_BEFORE_TURN_ENDS_MS,
+          silenceDurationMs: options.silenceMs ?? SILENCE_BEFORE_TURN_ENDS_MS,
         },
       },
       contextWindowCompression: { slidingWindow: {} },

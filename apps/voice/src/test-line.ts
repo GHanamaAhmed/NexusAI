@@ -1,4 +1,4 @@
-import { connectGeminiLive } from "@nexus/ai"
+import type { ModelId } from "@nexus/ai"
 import type { ConfirmationOrder } from "@nexus/conversation"
 import {
   type DialFormat,
@@ -10,6 +10,7 @@ import {
 import { Ari } from "./ari.js"
 import { Call, type CallResult } from "./call.js"
 import { startMediaServer } from "./media.js"
+import { connectFor, testSettings, type VoiceKeys } from "./sessions.js"
 
 /**
  * Test calls run next to the voice app: their own Asterisk app and audio port
@@ -25,6 +26,8 @@ export type TestCall = {
   phone: string
   line: string
   order: ConfirmationOrder
+  /** The default model unless named. */
+  model?: ModelId
   voice?: string
   log?: (line: string) => void
 }
@@ -56,7 +59,10 @@ export function checkTestNumber(phone: string) {
 }
 
 export async function openTestLine(): Promise<TestLine> {
-  const apiKey = required("GEMINI_API_KEY")
+  const keys: VoiceKeys = {
+    gemini: required("GEMINI_API_KEY"),
+    openai: process.env.OPENAI_API_KEY || undefined,
+  }
   const ari = new Ari(APP, "nexus", required("ARI_PASSWORD"))
   const dialFormat = (process.env.DIAL_FORMAT ?? "national") as DialFormat
   let current: Call | null = null
@@ -72,12 +78,13 @@ export async function openTestLine(): Promise<TestLine> {
   })
 
   return {
-    async call({ phone, line, order, voice, log = console.log }) {
+    async call({ phone, line, order, model, voice, log = console.log }) {
       checkTestNumber(phone)
       if (current) {
         throw new Error("A test call is already running")
       }
-      const language = order.customer.language
+      const { language } = order.customer
+      const settings = testSettings(model, voice)
       const call: Call = new Call({
         ari,
         app: APP,
@@ -85,19 +92,8 @@ export async function openTestLine(): Promise<TestLine> {
         order,
         endpoint: `PJSIP/${toDialString(phone, dialFormat)}@${line}`,
         log,
-        connect: ({ instruction, tools, onClose }) =>
-          connectGeminiLive({
-            apiKey,
-            model: process.env.LIVE_MODEL || undefined,
-            voice:
-              voice ??
-              (language === "fr"
-                ? (process.env.VOICE_FR ?? "Kore")
-                : (process.env.VOICE_AR ?? "Callirrhoe")),
-            instruction,
-            tools,
-            onClose,
-          }),
+        maxCallSeconds: settings.max_call_seconds,
+        connect: (options) => connectFor(settings, language, keys, options),
       })
       current = call
       try {

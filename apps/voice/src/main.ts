@@ -1,4 +1,3 @@
-import { connectGeminiLive, DEFAULT_LIVE_MODEL } from "@nexus/ai"
 import { createDb } from "@nexus/db"
 import { Ari } from "./ari.js"
 import { Call } from "./call.js"
@@ -6,6 +5,12 @@ import { loadConfig } from "./config.js"
 import { Dialer } from "./dialer.js"
 import { readRegistrations } from "./lines.js"
 import { startMediaServer } from "./media.js"
+import {
+  connectFor,
+  readAccountSettings,
+  runnableSettings,
+  type VoiceKeys,
+} from "./sessions.js"
 
 const MEDIA_PORT = 8787
 const RECONNECT_MS = 5_000
@@ -14,6 +19,10 @@ const config = loadConfig()
 const db = createDb(config.databaseUrl)
 const ari = new Ari("nexus", "nexus", config.ariPassword)
 const log = (line: string) => console.log(line)
+const keys: VoiceKeys = {
+  gemini: config.geminiApiKey,
+  openai: config.openaiApiKey,
+}
 
 const dialer = new Dialer({
   db,
@@ -22,28 +31,24 @@ const dialer = new Dialer({
   window: config.callWindow,
   dialFormat: config.dialFormat,
   limits: config.limits,
-  model: config.liveModel ?? DEFAULT_LIVE_MODEL,
+  settingsFor: async (accountId) =>
+    runnableSettings(await readAccountSettings(db, accountId, log), keys, log),
   log,
-  startCall: (order, endpoint) => {
+  startCall: (order, endpoint, settings) => {
+    const { language } = order.customer
     const call: Call = new Call({
       ari,
       order,
       endpoint,
+      style: settings.style[language],
+      maxCallSeconds: settings.max_call_seconds,
       // What was said is in the attempt's transcript, not the logs.
       log: (line) => {
         if (!/ (agent|customer): /.test(line)) {
           log(`${call.mediaChannel} ${line}`)
         }
       },
-      connect: ({ instruction, tools, onClose }) =>
-        connectGeminiLive({
-          apiKey: config.geminiApiKey,
-          model: config.liveModel,
-          voice: config.voices[order.customer.language],
-          instruction,
-          tools,
-          onClose,
-        }),
+      connect: (options) => connectFor(settings, language, keys, options),
     })
     call.dial().catch((error: unknown) => log(`Dial: ${String(error)}`))
     return call

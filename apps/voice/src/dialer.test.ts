@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events"
+import { defaultVoiceSettings, type VoiceSettings } from "@nexus/ai"
 import type { ConfirmationOrder } from "@nexus/conversation"
 import { parseAllowedNumbers, parseCallWindow } from "@nexus/core"
 import type { Db, TaskPayload } from "@nexus/db"
@@ -110,6 +111,7 @@ describe("Dialer", () => {
       callsEnabled?: boolean
       allowedNumbers?: string
       limits?: Partial<Limits>
+      settingsFor?: (accountId: string) => Promise<VoiceSettings>
     } = {}
   ) {
     return new Dialer({
@@ -119,7 +121,7 @@ describe("Dialer", () => {
       window,
       dialFormat: "national",
       limits: { perLine: 1, total: 10, perStore: 3, ...options.limits },
-      model: "test-model",
+      settingsFor: options.settingsFor ?? (async () => defaultVoiceSettings()),
       log: () => {},
       startCall: (order, endpoint) => {
         const call = new FakeCall(order, endpoint)
@@ -349,7 +351,85 @@ describe("Dialer", () => {
       transcript: [{ who: "agent", text: "السلام عليكم، معايا سارة؟" }],
       callback_at: null,
     })
-    expect(attempt.cost).toMatchObject({ usd: 0.0408, model: "test-model" })
+    expect(attempt.cost).toMatchObject({
+      usd: 0.0408,
+      model: "gemini-3.8-live",
+    })
+  })
+
+  it("calls with its account's settings, and records that model at its prices", async () => {
+    const accounts: string[] = []
+    const settings = defaultVoiceSettings()
+    settings.active_model = "gpt-realtime-2.1-mini"
+    settings.models["gpt-realtime-2.1-mini"] = {
+      prices: {
+        kind: "tokens",
+        text_in: 1,
+        audio_in: 1,
+        text_out: 1,
+        audio_out: 1_000,
+      },
+    }
+    const started: VoiceSettings[] = []
+    const dialer = new Dialer({
+      db,
+      callsEnabled: true,
+      allowedNumbers: parseAllowedNumbers("any"),
+      window,
+      dialFormat: "national",
+      limits: { perLine: 1, total: 10, perStore: 3 },
+      settingsFor: async (id) => {
+        accounts.push(id)
+        return settings
+      },
+      log: () => {},
+      startCall: (order, endpoint, used) => {
+        started.push(used)
+        const call = new FakeCall(order, endpoint)
+        calls.push(call)
+        return call
+      },
+    })
+    await dialer.updateLines(lines("line01"), noon)
+    const [id] = await queue("store-1", ["+213551234567"])
+    await dialer.dialQueued(noon)
+    expect(accounts).toEqual([accountId])
+    expect(started).toEqual([settings])
+
+    await finish(
+      calls[0]!,
+      id!,
+      result({
+        answeredAt: noon,
+        usage: {
+          ...noUsage,
+          promptTokens: 1,
+          responseTokens: 1000,
+          responseAudioTokens: 1000,
+        },
+      })
+    )
+    const attempt = await readAttempt(id!)
+    expect(attempt.cost).toMatchObject({
+      usd: 1,
+      model: "gpt-realtime-2.1-mini",
+    })
+  })
+
+  it("records a session priced by the minute, which has no tokens", async () => {
+    const settings = defaultVoiceSettings()
+    settings.active_model = "gpt-live-1"
+    const dialer = makeDialer({ settingsFor: async () => settings })
+    await dialer.updateLines(lines("line01"), noon)
+    const [id] = await queue("store-1", ["+213551234567"])
+    await dialer.dialQueued(noon)
+    await finish(
+      calls[0]!,
+      id!,
+      result({ answeredAt: noon, usage: { ...noUsage, seconds: 60 } })
+    )
+    const attempt = await readAttempt(id!)
+    expect(attempt.cost).toMatchObject({ usd: 0.05, model: "gpt-live-1" })
   })
 
   it.each([

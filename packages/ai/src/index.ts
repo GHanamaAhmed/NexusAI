@@ -31,6 +31,10 @@ export type Usage = {
   cachedTokens: number
   /** Of the response: audio. */
   responseAudioTokens: number
+  /** Of the cached tokens: audio, where the provider says. */
+  cachedAudioTokens?: number
+  /** Seconds of session, where the provider bills by time. */
+  seconds?: number
 }
 
 /** One spoken conversation with a model; only src/gemini knows which one. */
@@ -44,8 +48,12 @@ export interface VoiceSession {
   ): void
   onTurnComplete(listener: () => void): void
   onUsage(listener: (usage: Usage) => void): void
+  /** The customer's first words, which start the conversation. */
   start(openingText: string): void
+  /** Tells the model what to do now, such as that the call's time is up. */
+  instruct(text: string): void
   close(): void
 }
 
 export * from "./gemini/live.js"
+export * from "./settings.js"

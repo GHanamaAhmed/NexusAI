@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events"
 import type { ToolCall, VoiceSession } from "@nexus/ai"
-import { type ConfirmationOrder, OPENING } from "@nexus/conversation"
+import { type ConfirmationOrder, OPENING, TIME_UP } from "@nexus/conversation"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { WebSocket } from "ws"
 import { Call, type Connect } from "./call.js"
@@ -27,6 +27,7 @@ class FakeSocket extends EventEmitter {
 class FakeSession implements VoiceSession {
   heard: Buffer[] = []
   started: string[] = []
+  instructed: string[] = []
   closed = false
   audio: (pcm: Buffer) => void = () => {}
   tool: (call: ToolCall) => Promise<Record<string, unknown>> = async () => ({})
@@ -48,6 +49,9 @@ class FakeSession implements VoiceSession {
   onUsage() {}
   start(text: string) {
     this.started.push(text)
+  }
+  instruct(text: string) {
+    this.instructed.push(text)
   }
   close() {
     this.closed = true
@@ -114,6 +118,7 @@ describe("Call", () => {
       connect,
       order,
       endpoint: "PJSIP/0551234567@line01",
+      maxCallSeconds: 150,
       log: () => {},
     })
     await call.dial()
@@ -124,7 +129,7 @@ describe("Call", () => {
     vi.useRealTimers()
   })
 
-  it("connects to Gemini before it dials", () => {
+  it("connects to the model before it dials", () => {
     expect(steps.slice(0, 2)).toEqual(["connect", "POST /channels"])
   })
 
@@ -297,7 +302,86 @@ describe("Call", () => {
     })
   })
 
-  it("hangs up when Gemini closes during the call", async () => {
+  describe("at the longest call", () => {
+    const toLimit = () => vi.advanceTimersByTimeAsync(150_000 - 2_000)
+
+    it("counts from the answer, not the ringing", async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+      await answer()
+      greet()
+      await vi.advanceTimersByTimeAsync(150_000 - 2_000 - 1)
+      expect(sessions[0]!.instructed).toEqual([])
+      await vi.advanceTimersByTimeAsync(1)
+      expect(sessions[0]!.instructed).toEqual([TIME_UP])
+    })
+
+    it("has the model say goodbye, stops listening, and hangs up after it", async () => {
+      await answer()
+      greet()
+      await toLimit()
+      expect(sessions[0]!.instructed).toEqual([TIME_UP])
+      expect(hungUp()).toBe(false)
+
+      const heard = sessions[0]!.heard.length
+      media.onAudio(voice())
+      expect(sessions[0]!.heard).toHaveLength(heard)
+
+      sessions[0]!.turnComplete()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(hungUp()).toBe(true)
+    })
+
+    it("hangs up even when the model says nothing", async () => {
+      await answer()
+      greet()
+      await toLimit()
+      await vi.advanceTimersByTimeAsync(8_000 + 3_000)
+      expect(hungUp()).toBe(true)
+    })
+
+    it("just ends a call that was never greeted", async () => {
+      await call.onEvent({ type: "StasisStart", channel: { id: channelId } })
+      await vi.advanceTimersByTimeAsync(150_000)
+      expect(hungUp()).toBe(true)
+    })
+
+    it("takes the limit it's given", async () => {
+      const ari = {
+        request: async (
+          method: string,
+          path: string,
+          query: Record<string, string> = {}
+        ) => {
+          if (path === "/channels") {
+            channelId = query.channelId!
+          }
+          if (method === "DELETE") {
+            steps.push(`${method} ${path}`)
+          }
+          return null
+        },
+      }
+      const short = new Call({
+        ari,
+        connect: async () => new FakeSession(),
+        order,
+        endpoint: "PJSIP/0551234567@line01",
+        maxCallSeconds: 60,
+        log: () => {},
+      })
+      await short.dial()
+      await short.onEvent({
+        type: "StasisStart",
+        channel: { id: channelId },
+      })
+      await vi.advanceTimersByTimeAsync(59_999)
+      expect(hungUp()).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(hungUp()).toBe(true)
+    })
+  })
+
+  it("hangs up when the model closes during the call", async () => {
     await answer()
     closers[0]!("internal error")
     expect(hungUp()).toBe(true)
@@ -328,6 +412,7 @@ describe("Call for a test line", () => {
       connect: async () => new FakeSession(),
       order,
       endpoint: "PJSIP/0551234567@line01",
+      maxCallSeconds: 150,
       log: () => {},
       app: "nexus-test",
       mediaHost: "nexus_media_test",

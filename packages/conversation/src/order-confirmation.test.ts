@@ -1,13 +1,17 @@
+import { createHash } from "node:crypto"
 import { describe, expect, it } from "vitest"
 import {
   answerLookup,
   buildInstruction,
   CONFIRMATION_TOOLS,
   type ConfirmationOrder,
+  DEFAULT_GREETING,
+  DEFAULT_SPEAKING,
   outcomeForTool,
   placeChange,
   refuseOutcome,
   saidYes,
+  sampleOrder,
 } from "./order-confirmation.js"
 
 const order = (
@@ -62,6 +66,89 @@ describe("buildInstruction", () => {
     expect(text).not.toContain("أولف")
     expect(text).toContain("never the street or the address")
     expect(text).toContain("never suggest picking the order up at an office")
+  })
+
+  describe("with an admin's style", () => {
+    const task = (language: "ar" | "fr"): ConfirmationOrder => ({
+      store: { name: "Boutique Yasmine" },
+      customer: { name: "Sara", language },
+      order: {
+        items: [{ title: "Chemise", quantity: 2 }],
+        total: 6500,
+        delivery: { type: "home", wilaya_code: 16, commune: "باب الزوار" },
+      },
+    })
+    const fingerprint = (text: string) =>
+      createHash("sha256").update(text).digest("hex")
+
+    // Taken from the text before any of it could be changed.
+    it.each([
+      [
+        "ar",
+        4870,
+        "12679debbd00988238804b46b07812df12229cf44ff62a4910622d6182dbe44f",
+      ],
+      [
+        "fr",
+        4263,
+        "737d15851ffe1dbe0d3c792f6ddadb64e533db05a91974b59f14570fdf4b69e8",
+      ],
+    ] as const)(
+      "is today's text for %s without one",
+      (language, length, hash) => {
+        const nothing = { greeting: null, speaking: null, extra_rules: null }
+        for (const style of [undefined, {}, nothing]) {
+          const text = buildInstruction(task(language), now, style)
+          expect(text).toHaveLength(length)
+          expect(fingerprint(text)).toBe(hash)
+        }
+      }
+    )
+
+    it("changes only the parts it names", () => {
+      const before = buildInstruction(task("fr"), now)
+      const text = buildInstruction(task("fr"), now, {
+        greeting: "Salut {name}, c'est la boutique",
+        speaking: "Speak like a neighbour.",
+        extra_rules: "Never mention the weather.",
+      })
+      expect(text).toContain(
+        'Your first words are exactly "Salut Sara, c\'est la boutique"'
+      )
+      expect(text).toContain("Speak like a neighbour.")
+      expect(text).toContain("Never mention the weather.")
+      expect(text).not.toContain(DEFAULT_SPEAKING.fr)
+      // The call's protocol stays, whatever the style says.
+      for (const part of ["confirm_order", "request_change", "find_place"]) {
+        expect(before).toContain(part)
+        expect(text).toContain(part)
+      }
+    })
+
+    it("takes a name with characters a replacement treats as special", () => {
+      const named = task("fr")
+      named.customer.name = "$& Sara"
+      const text = buildInstruction(named, now, { greeting: "Salut {name}" })
+      expect(text).toContain('exactly "Salut $& Sara"')
+    })
+
+    it("offers its default text for going back to", () => {
+      expect(DEFAULT_GREETING.ar).toContain("{name}")
+      expect(DEFAULT_GREETING.fr).toContain("{name}")
+      expect(buildInstruction(task("ar"), now)).toContain(DEFAULT_SPEAKING.ar)
+    })
+
+    it("has a sample order for each language", () => {
+      for (const language of ["ar", "fr"] as const) {
+        expect(sampleOrder(language).customer.language).toBe(language)
+        expect(buildInstruction(sampleOrder(language), now)).toContain(
+          DEFAULT_GREETING[language].replace(
+            "{name}",
+            sampleOrder(language).customer.name
+          )
+        )
+      }
+    })
   })
 })
 

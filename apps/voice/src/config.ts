@@ -32,6 +32,8 @@ export function loadConfig() {
   return {
     databaseUrl: required("DATABASE_URL"),
     geminiApiKey: required("GEMINI_API_KEY"),
+    /** Without it, OpenAI's models can't be chosen. */
+    openaiApiKey: process.env.OPENAI_API_KEY || undefined,
     ariPassword: required("ARI_PASSWORD"),
     /** Nothing is dialed unless this is "true". */
     callsEnabled: process.env.CALLS_ENABLED === "true",
@@ -47,10 +49,5 @@ export function loadConfig() {
     registrationsFile:
       process.env.REGISTRATIONS_FILE ??
       "/var/run/asterisk/nexus/registrations.txt",
-    liveModel: process.env.LIVE_MODEL || undefined,
-    voices: {
-      ar: process.env.VOICE_AR ?? "Callirrhoe",
-      fr: process.env.VOICE_FR ?? "Kore",
-    },
   }
 }
