@@ -10,7 +10,7 @@ import {
 import { Ari } from "./ari.js"
 import { Call, type CallResult } from "./call.js"
 import { startMediaServer } from "./media.js"
-import { callOptions, testSettings, type VoiceKeys } from "./sessions.js"
+import { callOptions, testKeys, testSettings } from "./sessions.js"
 
 /**
  * Test calls run next to the voice app: their own Asterisk app and audio port
@@ -59,10 +59,7 @@ export function checkTestNumber(phone: string) {
 }
 
 export async function openTestLine(): Promise<TestLine> {
-  const keys: VoiceKeys = {
-    gemini: required("GEMINI_API_KEY"),
-    openai: process.env.OPENAI_API_KEY || undefined,
-  }
+  const keys = testKeys()
   const ari = new Ari(APP, "nexus", required("ARI_PASSWORD"))
   const dialFormat = (process.env.DIAL_FORMAT ?? "national") as DialFormat
   let current: Call | null = null

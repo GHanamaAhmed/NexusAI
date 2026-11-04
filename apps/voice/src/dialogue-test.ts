@@ -1,4 +1,3 @@
-import { connectGeminiLive, modelInfo } from "@nexus/ai"
 import {
   answerLookup,
   buildInstruction,
@@ -9,11 +8,18 @@ import {
   placeChange,
   refuseOutcome,
 } from "@nexus/conversation"
+import {
+  connectFor,
+  modelArgument,
+  refuseWithoutText,
+  testKeys,
+  testSettings,
+} from "./sessions.js"
 
 /**
  * Scripted conversations with the real instruction and functions, the customer
  * played as text, with no phone:
- *   tsx src/dialogue-test.ts [part of a scenario's name]
+ *   tsx src/dialogue-test.ts [part of a scenario's name] [--model <id>]
  * Checks which functions the agent calls. Each run costs a few cents.
  */
 
@@ -34,10 +40,9 @@ type Scenario = {
   check: (result: Result) => string | null
 }
 
-const apiKey = process.env.GEMINI_API_KEY
-if (!apiKey) {
-  throw new Error("Set GEMINI_API_KEY")
-}
+const { model, rest } = modelArgument(process.argv.slice(2))
+refuseWithoutText(model)
+const keys = testKeys()
 const SCENARIO_TIMEOUT_MS = 90_000
 
 const order: ConfirmationOrder = {
@@ -154,11 +159,10 @@ const SCENARIOS: Scenario[] = [
 
 async function run(scenario: Scenario): Promise<Result> {
   const result: Result = { calls: [], lookups: [] }
-  const session = await connectGeminiLive({
-    apiKey: apiKey!,
-    voice: modelInfo("gemini-3.8-live").defaultVoices.ar,
+  const session = await connectFor(testSettings(model), "ar", keys, {
     instruction: buildInstruction(order, new Date()),
     tools: CONFIRMATION_TOOLS,
+    onClose: () => {},
   })
   return new Promise((resolve) => {
     let next = 0
@@ -211,7 +215,7 @@ async function run(scenario: Scenario): Promise<Result> {
   })
 }
 
-const only = process.argv[2]
+const only = rest[0]
 const scenarios = SCENARIOS.filter(({ name }) => !only || name.includes(only))
 let failed = 0
 for (const scenario of scenarios) {

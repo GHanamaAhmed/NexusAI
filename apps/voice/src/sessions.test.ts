@@ -13,7 +13,9 @@ import {
 import {
   callOptions,
   connectFor,
+  modelArgument,
   readAccountSettings,
+  refuseWithoutText,
   runnableSettings,
   testSettings,
 } from "./sessions.js"
@@ -135,6 +137,31 @@ describe("connectFor", () => {
         { instruction: "", tools: [], onClose: () => {} }
       )
     ).rejects.toThrow("OPENAI_API_KEY")
+  })
+})
+
+describe("modelArgument", () => {
+  it("leaves arguments without a model alone", () => {
+    expect(modelArgument(["a", "b"])).toEqual({ rest: ["a", "b"] })
+  })
+
+  it("takes the model out, wherever it is", () => {
+    expect(modelArgument(["a", "--model", "gpt-live-1", "b"])).toEqual({
+      model: "gpt-live-1",
+      rest: ["a", "b"],
+    })
+  })
+
+  it.each([[["--model"]], [["--model", "gpt-9"]]])("refuses %o", (args) => {
+    expect(() => modelArgument(args)).toThrow("--model is one of")
+  })
+})
+
+describe("refuseWithoutText", () => {
+  it("refuses GPT-Live alone", () => {
+    expect(() => refuseWithoutText("gpt-live-1")).toThrow("demo.ts")
+    expect(() => refuseWithoutText("gpt-realtime-2.1")).not.toThrow()
+    expect(() => refuseWithoutText()).not.toThrow()
   })
 })
 

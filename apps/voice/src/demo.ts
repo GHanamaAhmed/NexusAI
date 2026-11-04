@@ -1,17 +1,22 @@
+import { modelSettings } from "@nexus/ai"
 import type { ConfirmationOrder } from "@nexus/conversation"
+import { callCost } from "./cost.js"
+import { modelArgument, testSettings } from "./sessions.js"
 import { checkTestNumber, openTestLine } from "./test-line.js"
 
 /**
  * One spoken test call with a made-up order:
- *   tsx src/demo.ts +213XXXXXXXXX [line] [ar|fr] [voice]
- * Prints the conversation, the outcome and the tokens used. It runs next to
- * the voice app (test-line.ts).
+ *   tsx src/demo.ts +213XXXXXXXXX [line] [ar|fr] [voice] [--model <id>]
+ * Prints the conversation, the outcome, and the tokens and cost used. It runs
+ * next to the voice app (test-line.ts).
  */
 
-const [phone = "", line = "line01", language = "ar", voice] =
-  process.argv.slice(2)
+const { model, rest } = modelArgument(process.argv.slice(2))
+const [phone = "", line = "line01", language = "ar", voice] = rest
 if (language !== "ar" && language !== "fr") {
-  throw new Error("Usage: demo.ts +213XXXXXXXXX [line] [ar|fr] [voice]")
+  throw new Error(
+    "Usage: demo.ts +213XXXXXXXXX [line] [ar|fr] [voice] [--model <id>]"
+  )
 }
 checkTestNumber(phone)
 
@@ -29,7 +34,7 @@ const order: ConfirmationOrder = {
 }
 
 const testLine = await openTestLine()
-const result = await testLine.call({ phone, line, order, voice })
+const result = await testLine.call({ phone, line, order, model, voice })
 console.log(
   `outcome: ${result.outcome ?? "none"} ${JSON.stringify(result.args)}`
 )
@@ -38,6 +43,11 @@ if (result.change) {
 }
 console.log(
   `tokens: prompt ${result.usage.promptTokens}, response ${result.usage.responseTokens}`
+)
+const settings = testSettings(model)
+const { prices } = modelSettings(settings, settings.active_model)
+console.log(
+  `cost of ${settings.active_model}: ${JSON.stringify(callCost(result.usage, prices))}`
 )
 testLine.close()
 process.exit(0)

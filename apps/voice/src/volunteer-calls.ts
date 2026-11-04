@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { setTimeout as sleep } from "node:timers/promises"
+import { modelArgument } from "./sessions.js"
 import { checkTestNumber, openTestLine } from "./test-line.js"
 import {
   type CallRecord,
@@ -15,16 +16,18 @@ import {
 
 /**
  * Calls one volunteer through their card, one scenario per call:
- *   tsx src/volunteer-calls.ts <card.json> [line] [scenarios, e.g. 3,7]
- * Each call's result is added to <card>.results.json as soon as it ends; a
+ *   tsx src/volunteer-calls.ts <card.json> [line] [scenarios, e.g. 3,7] [--model <id>]
+ * Each call's result is added to <card>.results.json, or
+ * <card>.<model>.results.json with a model, as soon as it ends; a
  * scenario nobody answered can be called again by number. What was said is
  * printed only with SHOW_WORDS=1. PAUSE_SECONDS (60) separates the calls.
  */
 
-const [cardPath = "", line = "line01", only] = process.argv.slice(2)
+const { model, rest } = modelArgument(process.argv.slice(2))
+const [cardPath = "", line = "line01", only] = rest
 if (!cardPath.endsWith(".json")) {
   throw new Error(
-    "Usage: volunteer-calls.ts <card.json> [line] [scenarios, e.g. 3,7]"
+    "Usage: volunteer-calls.ts <card.json> [line] [scenarios, e.g. 3,7] [--model <id>]"
   )
 }
 const card = readCard(JSON.parse(await readFile(cardPath, "utf8")))
@@ -40,7 +43,10 @@ if (scenarios.some((n) => !Number.isInteger(n) || n < 1 || n > total)) {
 const pauseMs = Number(process.env.PAUSE_SECONDS ?? 60) * 1000
 const showWords = process.env.SHOW_WORDS === "1"
 
-const resultsPath = cardPath.replace(/\.json$/, ".results.json")
+const resultsPath = cardPath.replace(
+  /\.json$/,
+  model ? `.${model}.results.json` : ".results.json"
+)
 const records: CallRecord[] = existsSync(resultsPath)
   ? JSON.parse(await readFile(resultsPath, "utf8"))
   : []
@@ -59,6 +65,7 @@ for (const [index, n] of scenarios.entries()) {
       phone: card.phone,
       line,
       order: orderFor(card, n),
+      model,
       log: (text) => {
         if (showWords || !/ (agent|customer): /.test(text)) {
           console.log(`  ${text}`)

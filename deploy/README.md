@@ -86,12 +86,14 @@ sudo docker compose -p nexus start api worker voice
 
 ## Test call
 
-`apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome and the tokens. It refuses a number that isn't in `ALLOWED_NUMBERS` (read from `/srv/nexus/.env`). Test calls run next to the voice app, with their own Asterisk app (`nexus-test`) and audio port (8788, `nexus_media_test` in `websocket_client.conf`), so nothing is stopped and the health check stays green. Use a line the voice app isn't calling on. Run it only with the owner's agreement, from a copy of the repository on the server:
+`apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome, the tokens and the cost. It refuses a number that isn't in `ALLOWED_NUMBERS` (read from `/srv/nexus/.env`). Test calls run next to the voice app, with their own Asterisk app (`nexus-test`) and audio port (8788, `nexus_media_test` in `websocket_client.conf`), so nothing is stopped and the health check stays green. Use a line the voice app isn't calling on. Run it only with the owner's agreement, from a copy of the repository on the server:
 
 ```sh
 sudo docker run --rm --network host --env-file /srv/nexus/.env --env-file /srv/nexus/internal.env \
-  -v <copy>:/work -w /work/apps/voice node:24-slim ./node_modules/.bin/tsx src/demo.ts +213XXXXXXXXX line01 ar
+  -v <copy>:/work -w /work/apps/voice node:24-slim ./node_modules/.bin/tsx src/demo.ts +213XXXXXXXXX line01 ar --model gpt-realtime-2.1
 ```
+
+`--model` tries another voice model: `gemini-3.8-live`, `gpt-realtime-2.1`, `gpt-realtime-2.1-mini` or `gpt-live-1`, with each model's default voices and settings. OpenAI's need `OPENAI_API_KEY` in `/srv/nexus/.env`. It also prints what the call cost at that model's default prices. `dialogue-test.ts` and `voice-test.ts` take `--model` too, except for GPT-Live, which takes no typed customer. On `volunteer-calls.ts`, `--model` keeps each model's results in their own file, `<label>.<model>.results.json`, so their scores can be compared.
 
 ## Volunteer calls
 

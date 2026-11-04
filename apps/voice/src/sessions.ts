@@ -4,6 +4,7 @@ import {
   connectGptLive,
   connectOpenAIRealtime,
   defaultVoiceSettings,
+  MODEL_IDS,
   modelInfo,
   type ModelId,
   modelSettings,
@@ -72,6 +73,41 @@ export function runnableSettings(
     return { ...settings, active_model }
   }
   return settings
+}
+
+/** The API keys a test tool runs with, from its environment. */
+export function testKeys(): VoiceKeys {
+  const gemini = process.env.GEMINI_API_KEY
+  if (!gemini) {
+    throw new Error("Set GEMINI_API_KEY")
+  }
+  return { gemini, openai: process.env.OPENAI_API_KEY || undefined }
+}
+
+/** Takes `--model <id>` out of a test tool's arguments. */
+export function modelArgument(args: string[]): {
+  model?: ModelId
+  rest: string[]
+} {
+  const at = args.indexOf("--model")
+  if (at === -1) {
+    return { rest: args }
+  }
+  const model = args[at + 1] as ModelId
+  if (!MODEL_IDS.includes(model)) {
+    throw new Error(`--model is one of ${MODEL_IDS.join(", ")}`)
+  }
+  return { model, rest: args.filter((_, i) => i !== at && i !== at + 1) }
+}
+
+/**
+ * GPT-Live takes no typed customer, so a tool that plays one as text can't test
+ * it: it needs a phone call.
+ */
+export function refuseWithoutText(model?: ModelId) {
+  if (model && modelInfo(model).provider === "openai-live") {
+    throw new Error(`${model} takes no typed customer; test it with demo.ts`)
+  }
 }
 
 /** The default settings with another model, or voice, for a test run. */

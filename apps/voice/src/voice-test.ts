@@ -1,21 +1,32 @@
-import { connectGeminiLive } from "@nexus/ai"
+import { modelInfo } from "@nexus/ai"
 import {
   buildInstruction,
   CONFIRMATION_TOOLS,
   OPENING,
 } from "@nexus/conversation"
 import { medianPitch } from "./audio.js"
+import {
+  connectFor,
+  modelArgument,
+  refuseWithoutText,
+  testKeys,
+  testSettings,
+} from "./sessions.js"
 
 /**
  * How steady each voice's pitch stays over a scripted call, with no phone:
- *   VOICES=Aoede,Kore tsx src/voice-test.ts
- * A voice that swings between low and high can sound like two people.
+ *   VOICES=Aoede,Kore tsx src/voice-test.ts [--model <id>]
+ * A voice that swings between low and high can sound like two people. With a
+ * model and no VOICES, it measures all of that model's.
  */
-const apiKey = process.env.GEMINI_API_KEY
-if (!apiKey) {
-  throw new Error("Set GEMINI_API_KEY")
-}
-const voices = (process.env.VOICES ?? "Aoede,Kore,Leda,Zephyr").split(",")
+const { model } = modelArgument(process.argv.slice(2))
+refuseWithoutText(model)
+const keys = testKeys()
+const voices = process.env.VOICES
+  ? process.env.VOICES.split(",")
+  : model
+    ? modelInfo(model).voices.map((voice) => voice.id)
+    : ["Aoede", "Kore", "Leda", "Zephyr"]
 const CUSTOMER = [
   "إيه، أنا هو.",
   "بصح حاب نبدل العنوان.",
@@ -28,9 +39,8 @@ async function measure(voice: string): Promise<number[]> {
   const pitches: number[] = []
   let turn: Buffer[] = []
   let next = 0
-  const session = await connectGeminiLive({
-    apiKey: apiKey!,
-    voice,
+  const session = await connectFor(testSettings(model, voice), "ar", keys, {
+    onClose: () => {},
     instruction: buildInstruction(
       {
         store: { name: "متجر الياسمين" },
