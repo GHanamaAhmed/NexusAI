@@ -31,6 +31,21 @@ Two Algerian mobile networks behaved the same way, so the limit is in the provid
 
 On 2026-11-04 `line10` answered in 0.3 s, twice, with no ring, and Asterisk ended the call for lack of audio after 84 s, while `line01` rang the same phone normally each time. Lines 1 to 9 rang the same phone normally that day. `MAX_CALLS_TOTAL` is 9, so calls fill lines 1 to 9 and don't reach line 10 while those are registered.
 
+## Spoken calls with OpenAI's models
+
+Tested on 2026-11-04, on Mobilis, through the test line and then through real tasks, all to the owner's number:
+
+- **`gpt-realtime-2.1`:** every answer recorded, and the scripted dialogues passed 7 of 7. Its Darija sounded translated ("نخلي التأكيد يمشي"), and the owner found its pace heavy, even at speed 1.25.
+- **`gpt-realtime-2.1-mini`:** a quarter of the price, but it read a French order in Arabic, said a sentence of nonsense Darija, and passed 6 of 7 dialogues.
+- **`gpt-live-1`:**
+  - Before its instructions said how to ask for a function, one call in two told the customer the order was on its way and nothing ran.
+  - Since then (`docs/architecture.md`, Voice models), the next seven calls recorded the right answer: confirmations, a change of commune, and cancellations after asking why.
+  - It sends audio while it says nothing. Counted as speech, that kept calls open 15 seconds after the goodbye, so the call now ignores audio quieter than an RMS of 100.
+  - Its first words came 3.5 to 5 seconds after the answer, against about 3 for the other models.
+  - It reports the session's seconds as a running total, so a call's cost comes from the last report.
+- **Darija sentences in the account's way of speaking** (`docs/api.md`, Voice settings) made every model sound more natural than the instruction's English alone: written lines for reading the order, a yes, a wait, a change of place, a no and a call back. With the same sentences, `gpt-live-1` and `gemini-3.8-live` both recorded a confirmation, a change of commune and a cancellation right, and the owner chose `gpt-live-1`.
+- **The link from this server to the outside lost most packets** for about 20 minutes that afternoon, then recovered. Checks before calls timed out and were tried again.
+
 ## Audio per model
 
 Asterisk carries each call as 16-bit PCM at 24 kHz (`slin24`), and every model takes and gives the same, so nothing is converted on a call. `packages/ai/src/resample.ts` converts for a session handed another rate.

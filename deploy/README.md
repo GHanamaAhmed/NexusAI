@@ -110,10 +110,10 @@ The volunteer test measures how well the calls understand people answering in th
    ```sh
    sudo docker run --rm --network host --env-file /srv/nexus/.env --env-file /srv/nexus/internal.env \
      -v <copy>:/work -v /srv/nexus/volunteers:/volunteers -w /work/apps/voice node:24-slim \
-     ./node_modules/.bin/tsx src/volunteer-calls.ts /volunteers/V1.json line10
+     ./node_modules/.bin/tsx src/volunteer-calls.ts /volunteers/V1.json line09
    ```
 
-4. Each result goes into `/srv/nexus/volunteers/<label>.results.json` as soon as the call ends. A scenario nobody answered is called again by number (`... V1.json line10 3,7`); only the first answered call of each scenario counts, so a second try never hides a wrong answer.
+4. Each result goes into `/srv/nexus/volunteers/<label>.results.json` as soon as the call ends. A scenario nobody answered is called again by number (`... V1.json line09 3,7`); only the first answered call of each scenario counts, so a second try never hides a wrong answer.
 5. Score everyone together against the pass mark (at least 90% right, and a yes taken for a no, or the reverse, in at most 1% of calls):
 
    ```sh

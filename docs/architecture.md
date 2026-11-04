@@ -36,8 +36,8 @@ Every call goes through `VoiceSession` (`packages/ai/src/index.ts`), so the call
 | `gpt-realtime-2.1-mini` | `packages/ai/src/openai` | Tokens, cached ones at a lower price        |
 | `gpt-live-1`            | `packages/ai/src/openai` | The minute, plus its backend model's tokens |
 
-- **Settings are per account** (`docs/api.md`, Voice settings), read for each call, so a save applies to the next one. A row that can't be read gives the defaults, and a model whose key has gone gives way to Gemini, so calls don't stop over either. The attempt records the model that really ran.
-- **GPT-Live's functions run through a backend model** (Responses delegation), since its client delegation declares none. The voice model passes the conversation along and the backend decides which function to call. GPT-Live also reports no end of a turn and no interruption, so the call's own timers end the goodbye, and audio already sent keeps playing when the customer speaks over it.
+- **Settings are per account** (`docs/api.md`, Voice settings), read for each call, so a save applies to the next one. The API knows which models can be chosen from `VOICE_PROVIDERS`, which Compose sets from whether `OPENAI_API_KEY` is set, so the API holds no OpenAI key. A row that can't be read gives the defaults, and a model whose key has gone gives way to Gemini, so calls don't stop over either. The attempt records the model that really ran.
+- **GPT-Live's functions run through a backend model** (Responses delegation), since its client delegation declares none. Its voice is told to ask for a function with `<|SpawnThinking|>` and to say nothing is settled until the result comes, and the backend is told it acts and doesn't speak (`packages/ai/src/openai/live.ts`). The voice model passes the conversation along and the backend decides which function to call. GPT-Live also reports no end of a turn and no interruption, so the call's own timers end the goodbye, and audio already sent keeps playing when the customer speaks over it.
 - **The instruction's protocol stays in code.** Only the greeting, the way of speaking and extra rules can change, so an edit can't break the functions the code relies on.
 
 ## Data
@@ -53,3 +53,4 @@ Every call goes through `VoiceSession` (`packages/ai/src/index.ts`), so the call
 
 - Calls: 09:00 to 20:00 Algiers time, three tries per task, at most 150 seconds each from the answer unless the account's settings say otherwise (60 to 600).
 - With Gemini, a call costs about 1.5 US cents for a plain yes and 3 to 5 cents with a change of place, plus the phone line's minutes. Each attempt records its own cost (`docs/telephony.md`, Usage).
+- With GPT-Live, calls of 32 to 54 seconds cost 3 to 5 US cents at $0.05 a minute, its backend's tokens included, plus the phone line's minutes.
