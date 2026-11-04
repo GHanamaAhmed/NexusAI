@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/GHanamaAhmed/NexusAI/actions/workflows/deploy.yml"><img src="https://github.com/GHanamaAhmed/NexusAI/actions/workflows/deploy.yml/badge.svg?branch=main" alt="Deploy"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22-006233" alt="Node.js 22 or later">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-006233" alt="License: MIT"></a>
 </p>
 
 <p align="center">
@@ -59,6 +60,7 @@ NexusAI is a service that platforms call over HTTPS to hand work to AI. Each pla
 - [Operations](#operations)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
+- [License](#license)
 
 ## How it works
 
@@ -243,3 +245,7 @@ NexusAI calls the platform back twice per call: a check before dialing (`check_u
 - A pushed commit on `main` is released to production, so keep `main` releasable.
 - Database changes go in `packages/db/src/migrations.ts` and must work with the release before them, since a rollback changes the images and never the database.
 - Never commit a key, password or phone number. Test calls only go to numbers on the allow list.
+
+## License
+
+NexusAI is released under the [MIT License](LICENSE). You may use, change and share it, including commercially, as long as the copyright and licence notice stay with it.
