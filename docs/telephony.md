@@ -27,6 +27,10 @@ Pressing keys on the mobile reaches nothing. On a healthy 72-second call:
 
 Two Algerian mobile networks behaved the same way, so the limit is in the provider's service. Landlines are not tested. Enabling `telephone-event` is a question for the provider.
 
+## Line 10
+
+On 2026-11-04 `line10` answered in 0.3 s, twice, with no ring, and Asterisk ended the call for lack of audio after 84 s, while `line01` rang the same phone normally each time. Lines 2 to 9 are untested. A second call at the same moment goes to the next line, so this needs settling before customers are called.
+
 ## Audio per model
 
 Asterisk carries each call as 16-bit PCM at 24 kHz (`slin24`), and every model takes and gives the same, so nothing is converted on a call. `packages/ai/src/resample.ts` converts for a session handed another rate.

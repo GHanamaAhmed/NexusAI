@@ -68,6 +68,11 @@ export const DEFAULT_GREETING: Record<Language, string> = {
   fr: "Bonjour, je suis bien avec {name} ?",
 }
 
+const GOODBYE: Record<Language, string> = {
+  ar: "يعطيك الصحة، بالسلامة",
+  fr: "Merci, bonne journée",
+}
+
 /** What an admin changed; a missing or null part is the default. */
 export type InstructionStyle = {
   greeting?: string | null
@@ -119,7 +124,7 @@ How the call usually goes:
 1. Your first words are exactly "${greeting}", and nothing else. Then wait for them to answer. If they say nothing, wait; then say only "ألو؟", never the whole greeting again.
 2. When they say it's them, tell them they have an order from ${task.store.name}: what it is, the total and where it's going. For example "عندك كوموند من عند ${task.store.name}...". Then ask if it's good to send.
 3. Talk it through. If something is unclear, ask again in other words.
-4. Only when everything is settled and they've answered your last question, call the function that fits. Never call one while you're still asking or checking something; find_place is the only exception. After the function, say a short goodbye ("يعطيك الصحة، بالسلامة") and stop.
+4. Only when everything is settled and they've answered your last question, call the function that fits. Never call one while you're still asking or checking something; find_place is the only exception. After the function, say a short goodbye ("${GOODBYE[language]}") and stop.
 
 When to call each function:
 - confirm_order: they clearly said yes to the order: "إيه", "واه", "صحا", "oui", "d'accord" and the like all count. If you're not sure what they said, ask again; never guess a yes.

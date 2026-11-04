@@ -15,6 +15,7 @@ describe("GPT-Live", () => {
     voice: "brise",
     instruction: "Be brief.",
     backendModel: "gpt-6-luna",
+    language: "fr",
     tools: [{ name: "confirm_order", description: "The customer confirmed." }],
     onClose: (reason) => closes.push(reason),
     openSocket: (address) => {
@@ -57,9 +58,9 @@ describe("GPT-Live", () => {
     it("starts with its model, audio, voice and functions", async () => {
       await connect()
       expect(url).toBe("wss://api.openai.com/v1/live/sessions")
-      expect(socket.of("session.start")[0]!.session).toEqual({
+      const { session } = socket.of("session.start")[0]!
+      expect(session).toMatchObject({
         model: "gpt-live-1",
-        instructions: "Be brief.",
         audio: {
           format: { type: "audio/pcm", rate: 24_000 },
           output: { voice: "brise" },
@@ -68,7 +69,6 @@ describe("GPT-Live", () => {
           type: "responses",
           responses: {
             model: "gpt-6-luna",
-            instructions: "Be brief.",
             tools: [
               {
                 type: "function",
@@ -82,6 +82,26 @@ describe("GPT-Live", () => {
           },
         },
       })
+    })
+
+    it("tells the voice how to ask for its functions, its pace and its language", async () => {
+      await connect()
+      const { instructions } = socket.of("session.start")[0]!.session
+      expect(instructions.startsWith("Be brief.\n\n")).toBe(true)
+      expect(instructions).toContain("<|SpawnThinking|>")
+      expect(instructions).toContain("Never say the order is confirmed")
+      expect(instructions).toContain("brisk, natural pace")
+      expect(instructions).toContain("French ONLY")
+    })
+
+    it("tells the backend it acts and doesn't speak", async () => {
+      await connect()
+      const { instructions } =
+        socket.of("session.start")[0]!.session.delegation.responses
+      expect(instructions.startsWith("Be brief.\n\n")).toBe(true)
+      expect(instructions).toContain("You are the backend")
+      expect(instructions).toContain("only after the function confirms success")
+      expect(instructions).not.toContain("<|SpawnThinking|>")
     })
 
     it("waits for the session to start", async () => {

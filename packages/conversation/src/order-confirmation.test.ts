@@ -81,7 +81,8 @@ describe("buildInstruction", () => {
     const fingerprint = (text: string) =>
       createHash("sha256").update(text).digest("hex")
 
-    // Taken from the text before any of it could be changed.
+    // Taken from the text before any of it could be changed, then French's
+    // again when its goodbye came to be said in French.
     it.each([
       [
         "ar",
@@ -90,8 +91,8 @@ describe("buildInstruction", () => {
       ],
       [
         "fr",
-        4263,
-        "737d15851ffe1dbe0d3c792f6ddadb64e533db05a91974b59f14570fdf4b69e8",
+        4262,
+        "a02ea2374f096bef42c449a822430f592014fa68d64f3023a565d2bb7ea696c9",
       ],
     ] as const)(
       "is today's text for %s without one",

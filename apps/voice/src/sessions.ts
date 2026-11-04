@@ -184,6 +184,7 @@ export async function connectFor(
         apiKey: openaiKey(keys),
         voice,
         backendModel: String(model.backend_model),
+        language,
         log,
         ...options,
       })

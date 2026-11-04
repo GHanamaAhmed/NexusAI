@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import type { VoiceSession } from "../index.js"
 import { resample } from "../resample.js"
+import type { CallLanguage } from "../settings.js"
 import {
   functionTools,
   type OpenAIOptions,
@@ -42,9 +43,34 @@ const BACKEND_RUN_ENDS = new Set([
   "response.incomplete",
 ])
 
+/**
+ * The voice model runs no function itself. On a test call it told a customer the
+ * order was on its way and nothing was recorded, so it's told how it asks: OpenAI's
+ * prompting guide says to name this token, not to say "delegate".
+ */
+const VOICE_RULES = `# How your functions work
+You can't run the functions named above yourself. A backend model runs them for you, and it hears this conversation.
+Generate <|SpawnThinking|> whenever one of them should run: the customer agreed, cancelled, asked to change the place, asked to be called later or to talk to the shop, it's the wrong person or voicemail, or you need find_place for a place they said.
+Generate <|SpawnThinking|> before saying anything that depends on it, and do not guess the result while waiting.
+Never say the order is confirmed, cancelled, changed or on its way, and never say goodbye, until the backend's result has come.
+
+# Your pace
+Speak at a brisk, natural pace, the way people talk on a quick phone call, with connected articulation and minimal pauses. Keep sentences short and don't drag your words.`
+
+const VOICE_LANGUAGE: Record<CallLanguage, string> = {
+  ar: "# Language\nAlgerian Darija ONLY, unless the customer speaks whole sentences in French.",
+  fr: "# Language\nFrench ONLY, unless the customer speaks whole sentences in Darija. Say the order's details in French too, keeping only names as they are written.",
+}
+
+const BACKEND_RULES = `# You are the backend
+A voice model is talking with the customer. You don't speak to them: from the conversation, call the function that fits, following the rules above on when each may be called and what it needs. Pass the customer's own words.
+If a function answers with an error, say in a few words what's missing, so the voice can ask.
+Report an action as complete only after the function confirms success.`
+
 export type GptLiveOptions = OpenAIOptions & {
   /** The model that runs the functions; a client's own can't declare them. */
   backendModel: string
+  language: CallLanguage
 }
 
 /**
@@ -66,12 +92,14 @@ class GptLiveSession extends OpenAISession {
   }
 
   protected opened() {
-    const { instruction, tools, voice, backendModel } = this.live
+    const { instruction, language, tools, voice, backendModel } = this.live
     this.send({
       type: "session.start",
       session: {
         model: "gpt-live-1",
-        instructions: instruction,
+        instructions: [instruction, VOICE_RULES, VOICE_LANGUAGE[language]].join(
+          "\n\n"
+        ),
         audio: {
           format: { type: "audio/pcm", rate: RATE },
           output: { voice },
@@ -80,7 +108,7 @@ class GptLiveSession extends OpenAISession {
           type: "responses",
           responses: {
             model: backendModel,
-            instructions: instruction,
+            instructions: `${instruction}\n\n${BACKEND_RULES}`,
             tools: functionTools(tools),
             tool_choice: "auto",
             parallel_tool_calls: false,
