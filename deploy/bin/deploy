@@ -115,7 +115,10 @@ wait_registered() {
   return 1
 }
 
-has_service() { dc "$1" config --services | grep -qx "$2"; }
+# grep must read to the end: -q stops at its match, the command writing to it can
+# then die of SIGPIPE, and under pipefail that reads as no such service. A release
+# skipped its migrations that way and still reported success.
+has_service() { dc "$1" config --services | grep -x "$2" >/dev/null; }
 
 # The API answers its health check, from inside its container.
 wait_api() {
