@@ -20,13 +20,14 @@ if (language !== "ar" && language !== "fr") {
 }
 checkTestNumber(phone)
 
+const french = language === "fr"
 const order: ConfirmationOrder = {
-  store: { name: "متجر الياسمين" },
-  customer: { name: "غنامة أحمد", language },
+  store: { name: french ? "Boutique Yasmine" : "متجر الياسمين" },
+  customer: { name: french ? "Ghanama Ahmed" : "غنامة أحمد", language },
   order: {
     items: [
-      { title: "قميص قطن", quantity: 2 },
-      { title: "صباط رياضي", quantity: 1 },
+      { title: french ? "Chemise en coton" : "قميص قطن", quantity: 2 },
+      { title: french ? "Baskets" : "صباط رياضي", quantity: 1 },
     ],
     total: 6500,
     delivery: { type: "home", wilaya_code: 16, commune: "باب الزوار" },

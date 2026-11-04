@@ -210,7 +210,7 @@ describe("Call", () => {
     expect(await useTool("confirm_order", { yes: "إيه" })).toEqual({ ok: true })
     media.onAudio(Buffer.alloc(FRAME))
     expect(sessions[0]!.heard).toHaveLength(0)
-    sessions[0]!.audio(Buffer.alloc(FRAME * 50)) // a 1 s goodbye
+    sessions[0]!.audio(Buffer.concat(Array(50).fill(voice()))) // a 1 s goodbye
     sessions[0]!.turnComplete()
     // Sent by about 1.1 s; the phone plays it up to a second later.
     vi.advanceTimersByTime(2_000)

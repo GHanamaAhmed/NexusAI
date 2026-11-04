@@ -5,6 +5,15 @@ import { MediaCall } from "./media.js"
 
 const FRAME = 960 // 20 ms of 16-bit audio at 24 kHz
 
+/** Audio with sound in it; Buffer.alloc alone is silence. */
+const loud = (bytes: number) => {
+  const pcm = Buffer.alloc(bytes)
+  for (let i = 0; i + 1 < bytes; i += 2) {
+    pcm.writeInt16LE(i % 4 ? -3000 : 3000, i)
+  }
+  return pcm
+}
+
 class FakeSocket extends EventEmitter {
   readonly OPEN = 1
   readyState = 1
@@ -78,10 +87,42 @@ describe("MediaCall", () => {
 
   it("tells when the last words have been heard, ignoring the silence", () => {
     const heard = vi.fn()
-    call.play(Buffer.alloc(FRAME * 50)) // 1 s
+    call.play(loud(FRAME * 50)) // 1 s
     call.whenSpeechPlayed(heard)
     vi.advanceTimersByTime(900)
     expect(heard).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(300)
+    expect(heard).toHaveBeenCalledOnce()
+  })
+
+  it("doesn't wait for silence the model keeps sending", () => {
+    const heard = vi.fn()
+    call.play(loud(FRAME * 50)) // 1 s of words
+    call.whenSpeechPlayed(heard)
+    for (let ms = 0; ms < 1200; ms += 100) {
+      call.play(Buffer.alloc(FRAME * 5)) // then silence, as GPT-Live sends it
+      vi.advanceTimersByTime(100)
+    }
+    expect(heard).toHaveBeenCalledOnce()
+    expect(call.sent.speech).toBeGreaterThan(FRAME * 50)
+  })
+
+  it("doesn't wait for a piece of silence smaller than a frame", () => {
+    const heard = vi.fn()
+    call.play(Buffer.alloc(FRAME / 2))
+    call.whenSpeechPlayed(heard)
+    vi.advanceTimersByTime(100)
+    expect(heard).toHaveBeenCalledOnce()
+  })
+
+  it("waits for a piece of words smaller than a frame", () => {
+    const heard = vi.fn()
+    call.control({ event: "MEDIA_XOFF" })
+    call.play(loud(FRAME / 2))
+    call.whenSpeechPlayed(heard)
+    vi.advanceTimersByTime(200)
+    expect(heard).not.toHaveBeenCalled()
+    call.control({ event: "MEDIA_XON" })
     vi.advanceTimersByTime(300)
     expect(heard).toHaveBeenCalledOnce()
   })

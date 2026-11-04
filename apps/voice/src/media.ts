@@ -1,4 +1,5 @@
 import { WebSocketServer, type WebSocket } from "ws"
+import { rms } from "./audio.js"
 
 type MediaStart = {
   event: "MEDIA_START"
@@ -12,6 +13,12 @@ type MediaStart = {
 const FRAME_MS = 20
 /** Silence keeps at least this much audio waiting, to ride out timer delays. */
 const MIN_QUEUED_MS = 120
+/**
+ * GPT-Live keeps sending audio while it says nothing. Below this it's silence, so
+ * it doesn't hold the end of the call back: a call stayed open 15 seconds after
+ * its goodbye.
+ */
+const SILENT_RMS = 100
 
 /**
  * One call's audio socket, opened by Asterisk's WebSocket channel. Audio keeps
@@ -46,7 +53,7 @@ export class MediaCall {
     const now = Date.now()
     this.playedUntil =
       Math.max(now, this.playedUntil) + chunk.length / this.bytesPerMs
-    if (kind === "speech") {
+    if (kind === "speech" && rms(chunk) > SILENT_RMS) {
       this.speechUntil = this.playedUntil
     }
     this.socket.send(chunk)
@@ -108,7 +115,7 @@ export class MediaCall {
    */
   whenSpeechPlayed(callback: () => void) {
     const check = () => {
-      if (this.pending.length === 0 && Date.now() >= this.speechUntil) {
+      if (rms(this.pending) <= SILENT_RMS && Date.now() >= this.speechUntil) {
         callback()
       } else {
         setTimeout(check, FRAME_MS * 5)
