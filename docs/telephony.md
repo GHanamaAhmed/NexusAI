@@ -29,7 +29,7 @@ Two Algerian mobile networks behaved the same way, so the limit is in the provid
 
 ## Line 10
 
-On 2026-11-04 `line10` answered in 0.3 s, twice, with no ring, and Asterisk ended the call for lack of audio after 84 s, while `line01` rang the same phone normally each time. Lines 2 to 9 are untested. A second call at the same moment goes to the next line, so this needs settling before customers are called.
+On 2026-11-04 `line10` answered in 0.3 s, twice, with no ring, and Asterisk ended the call for lack of audio after 84 s, while `line01` rang the same phone normally each time. Lines 1 to 9 rang the same phone normally that day. `MAX_CALLS_TOTAL` is 9, so calls fill lines 1 to 9 and don't reach line 10 while those are registered.
 
 ## Audio per model
 
