@@ -48,8 +48,18 @@ NexusAI is a service that platforms call over HTTPS to hand work to AI. Each pla
 | Delivery      | Docker Compose behind Caddy; images signed with Sigstore cosign and scanned by Trivy |
 | Server and CI | Ansible for the server, GitHub Actions for checks, builds and releases               |
 
+## Built during a hackathon
+
+NexusAI was built from scratch during a hackathon, from 29 October to 4 November 2026, in 53 commits. It was built for [Matajr](https://matajr.shop), a multi-store commerce platform that already existed and is NexusAI's first client.
+
+| Built during the hackathon                                                                                                                                                                                                                                                                           | Already there before                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **NexusAI, all of it:** the API, worker and voice app; Asterisk on ten phone lines; the confirmation agent and its checks; four voice models behind one interface; the delivery places lookup; signed results; store designs with Meta's models; the server playbook and the signed release pipeline | **Matajr's platform:** stores on their own addresses, the storefronts and their visual builder, orders with cash on delivery and confirmation by hand, the merchant and platform dashboards, and its hosting, monitoring and backups |
+| **Matajr's side of it:** automated confirmation calls on orders, plans with AI credit to pay for calls, the voice settings page, and AI store designs in the builder                                                                                                                                 |                                                                                                                                                                                                                                      |
+
 ## Contents
 
+- [Built during a hackathon](#built-during-a-hackathon)
 - [How it works](#how-it-works)
 - [Current coverage](#current-coverage)
 - [Repository layout](#repository-layout)
