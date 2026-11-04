@@ -63,17 +63,37 @@ NexusAI is a service that commerce platforms call over HTTPS to hand work to AI.
 ## How it works
 
 ```mermaid
-flowchart LR
-  platform[Platform] -- task or design --> api[API]
-  api --> db[(Postgres)]
-  worker[Worker] -- check before call --> platform
+flowchart TB
+  platform[Commerce platform]
+  voiceModels[Voice models]
+
+  subgraph nexus [NexusAI]
+    voice[Voice app]
+    api[API]
+    worker[Worker]
+    asterisk[Asterisk]
+    db[(Postgres)]
+  end
+
+  designModels[Design models]
+  phone[Customer's phone]
+
+  platform ~~~ worker
+  platform -- tasks and designs --> api
+  worker -- checks and signed results --> platform
+  voice -- live audio --> voiceModels
+  voice -- dials --> asterisk
+  voice --> db
+  api --> db
   worker --> db
-  voice[Voice app] --> db
-  voice -- dials --> asterisk[Asterisk]
-  asterisk -- SIP lines --> phone[Customer]
-  voice -- live audio --> model[Voice model]
-  worker -- signed result --> platform
-  worker -- schema, brief --> meta[Design models]
+  worker -- brief and photos --> designModels
+  asterisk -- SIP lines --> phone
+
+  classDef part fill:#FFFFFF,stroke:#006233,color:#0E1A14
+  classDef outside fill:#006233,stroke:#006233,color:#FFFFFF
+  class api,worker,voice,db,asterisk part
+  class platform,phone,voiceModels,designModels outside
+  style nexus fill:transparent,stroke:#1B8A57,stroke-width:2px,color:#1B8A57
 ```
 
 ### A confirmation call
