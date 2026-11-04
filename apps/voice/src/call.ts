@@ -110,6 +110,8 @@ export class Call {
       style?: InstructionStyle
       /** From the answer to the goodbye. */
       maxCallSeconds: number
+      /** Connects to the model at the answer, instead of while it rings. */
+      connectWhenAnswered?: boolean
       /** PJSIP/<number>@<line> */
       endpoint: string
       log: (line: string) => void
@@ -132,7 +134,9 @@ export class Call {
 
   /** Starts connecting to the model, then dials. */
   async dial() {
-    this.session = this.connect()
+    if (!this.deps.connectWhenAnswered) {
+      this.session = this.connect()
+    }
     try {
       await this.deps.ari.request("POST", "/channels", {
         endpoint: this.deps.endpoint,
@@ -417,15 +421,19 @@ export class Call {
       clearTimeout(timer)
     }
     this.log(`ended: ${reason}`)
-    void this.session?.then((session) => session?.close())
-    this.resolve({
-      outcome: this.outcome,
-      args: this.args,
-      change: this.change,
-      cause,
-      answeredAt: this.answeredAt ? new Date(this.answeredAt) : null,
-      usage: { ...this.usage },
-      agentSaid: [...this.agentSaid],
-    })
+    // A session may have the last of its usage and words to report as it closes.
+    void Promise.resolve(this.session?.then((session) => session?.close()))
+      .catch((error: unknown) => this.log(`Closing: ${String(error)}`))
+      .finally(() =>
+        this.resolve({
+          outcome: this.outcome,
+          args: this.args,
+          change: this.change,
+          cause,
+          answeredAt: this.answeredAt ? new Date(this.answeredAt) : null,
+          usage: { ...this.usage },
+          agentSaid: [...this.agentSaid],
+        })
+      )
   }
 }

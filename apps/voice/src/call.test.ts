@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events"
-import type { ToolCall, VoiceSession } from "@nexus/ai"
+import type { ToolCall, Usage, VoiceSession } from "@nexus/ai"
 import { type ConfirmationOrder, OPENING, TIME_UP } from "@nexus/conversation"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { WebSocket } from "ws"
@@ -32,6 +32,8 @@ class FakeSession implements VoiceSession {
   audio: (pcm: Buffer) => void = () => {}
   tool: (call: ToolCall) => Promise<Record<string, unknown>> = async () => ({})
   turnComplete: () => void = () => {}
+  usage: (usage: Usage) => void = () => {}
+  closing?: Promise<void>
   sendAudio(pcm: Buffer) {
     this.heard.push(pcm)
   }
@@ -46,7 +48,9 @@ class FakeSession implements VoiceSession {
   onTurnComplete(listener: () => void) {
     this.turnComplete = listener
   }
-  onUsage() {}
+  onUsage(listener: (usage: Usage) => void) {
+    this.usage = listener
+  }
   start(text: string) {
     this.started.push(text)
   }
@@ -55,6 +59,7 @@ class FakeSession implements VoiceSession {
   }
   close() {
     this.closed = true
+    return this.closing
   }
 }
 
@@ -379,6 +384,91 @@ describe("Call", () => {
       await vi.advanceTimersByTimeAsync(1)
       expect(hungUp()).toBe(true)
     })
+  })
+
+  describe("with a model billed by the minute", () => {
+    const makeCall = async () => {
+      let connections = 0
+      const ari = {
+        request: async (
+          _method: string,
+          path: string,
+          query: Record<string, string> = {}
+        ) => {
+          if (path === "/channels") {
+            channelId = query.channelId!
+          }
+          return null
+        },
+      }
+      const minuteCall = new Call({
+        ari,
+        connect: async () => {
+          connections++
+          return new FakeSession()
+        },
+        order,
+        endpoint: "PJSIP/0551234567@line01",
+        maxCallSeconds: 150,
+        connectWhenAnswered: true,
+        log: () => {},
+      })
+      await minuteCall.dial()
+      return { minuteCall, connections: () => connections }
+    }
+
+    it("doesn't connect while the phone rings", async () => {
+      const { minuteCall, connections } = await makeCall()
+      expect(connections()).toBe(0)
+      await minuteCall.onEvent({
+        type: "StasisStart",
+        channel: { id: channelId },
+      })
+      expect(connections()).toBe(0)
+      await minuteCall.attachMedia(media)
+      expect(connections()).toBe(1)
+    })
+
+    it("never connects for a call nobody answers", async () => {
+      const { minuteCall, connections } = await makeCall()
+      await minuteCall.onEvent({
+        type: "ChannelDestroyed",
+        channel: { id: channelId },
+        cause: 19,
+      })
+      const result = await minuteCall.done
+      expect(result.cause).toBe(19)
+      expect(connections()).toBe(0)
+    })
+  })
+
+  it("reports the call once the session has reported its last", async () => {
+    let finishClosing = () => {}
+    await answer()
+    const session = sessions[0]!
+    session.closing = new Promise((resolve) => (finishClosing = resolve))
+
+    let reported = false
+    void call.done.then(() => (reported = true))
+    await call.onEvent({
+      type: "ChannelDestroyed",
+      channel: { id: channelId },
+      cause: 16,
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(session.closed).toBe(true)
+    expect(reported).toBe(false)
+
+    session.usage({
+      promptTokens: 0,
+      responseTokens: 0,
+      promptAudioTokens: 0,
+      cachedTokens: 0,
+      responseAudioTokens: 0,
+      seconds: 42,
+    })
+    finishClosing()
+    expect((await call.done).usage.seconds).toBe(42)
   })
 
   it("hangs up when the model closes during the call", async () => {

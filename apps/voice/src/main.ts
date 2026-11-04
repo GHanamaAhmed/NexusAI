@@ -6,7 +6,7 @@ import { Dialer } from "./dialer.js"
 import { readRegistrations } from "./lines.js"
 import { startMediaServer } from "./media.js"
 import {
-  connectFor,
+  callOptions,
   readAccountSettings,
   runnableSettings,
   type VoiceKeys,
@@ -40,15 +40,13 @@ const dialer = new Dialer({
       ari,
       order,
       endpoint,
-      style: settings.style[language],
-      maxCallSeconds: settings.max_call_seconds,
+      ...callOptions(settings, language, keys, log),
       // What was said is in the attempt's transcript, not the logs.
       log: (line) => {
         if (!/ (agent|customer): /.test(line)) {
           log(`${call.mediaChannel} ${line}`)
         }
       },
-      connect: (options) => connectFor(settings, language, keys, options),
     })
     call.dial().catch((error: unknown) => log(`Dial: ${String(error)}`))
     return call

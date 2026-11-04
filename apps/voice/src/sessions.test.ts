@@ -11,6 +11,8 @@ import {
   vi,
 } from "vitest"
 import {
+  callOptions,
+  connectFor,
   readAccountSettings,
   runnableSettings,
   testSettings,
@@ -96,6 +98,43 @@ describe("runnableSettings", () => {
     const settings = runnableSettings(openai, { gemini: "a" }, log)
     expect(settings.active_model).toBe("gemini-3.8-live")
     expect(log).toHaveBeenCalledOnce()
+  })
+})
+
+describe("callOptions", () => {
+  const settings = (model: "gemini-3.8-live" | "gpt-live-1") => ({
+    ...defaultVoiceSettings(),
+    active_model: model,
+    max_call_seconds: 90,
+  })
+
+  it("carries the longest call and the language's style", () => {
+    const withStyle = settings("gemini-3.8-live")
+    withStyle.style.fr.greeting = "Salut {name}"
+    const options = callOptions(withStyle, "fr", { gemini: "a" }, () => {})
+    expect(options.maxCallSeconds).toBe(90)
+    expect(options.style.greeting).toBe("Salut {name}")
+  })
+
+  it("connects while it rings, except when the model bills by the minute", () => {
+    const keys = { gemini: "a", openai: "b" }
+    const when = (model: "gemini-3.8-live" | "gpt-live-1") =>
+      callOptions(settings(model), "ar", keys, () => {}).connectWhenAnswered
+    expect(when("gemini-3.8-live")).toBe(false)
+    expect(when("gpt-live-1")).toBe(true)
+  })
+})
+
+describe("connectFor", () => {
+  it("refuses OpenAI's models without their key, as a failed connection", async () => {
+    await expect(
+      connectFor(
+        testSettings("gpt-realtime-2.1"),
+        "ar",
+        { gemini: "a" },
+        { instruction: "", tools: [], onClose: () => {} }
+      )
+    ).rejects.toThrow("OPENAI_API_KEY")
   })
 })
 

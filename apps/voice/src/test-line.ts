@@ -10,7 +10,7 @@ import {
 import { Ari } from "./ari.js"
 import { Call, type CallResult } from "./call.js"
 import { startMediaServer } from "./media.js"
-import { connectFor, testSettings, type VoiceKeys } from "./sessions.js"
+import { callOptions, testSettings, type VoiceKeys } from "./sessions.js"
 
 /**
  * Test calls run next to the voice app: their own Asterisk app and audio port
@@ -92,8 +92,7 @@ export async function openTestLine(): Promise<TestLine> {
         order,
         endpoint: `PJSIP/${toDialString(phone, dialFormat)}@${line}`,
         log,
-        maxCallSeconds: settings.max_call_seconds,
-        connect: (options) => connectFor(settings, language, keys, options),
+        ...callOptions(settings, language, keys, log),
       })
       current = call
       try {

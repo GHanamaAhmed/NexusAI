@@ -1,6 +1,8 @@
 import {
   type CallLanguage,
   connectGeminiLive,
+  connectGptLive,
+  connectOpenAIRealtime,
   defaultVoiceSettings,
   modelInfo,
   type ModelId,
@@ -20,6 +22,8 @@ export type SessionOptions = {
   tools: ToolDeclaration[]
   onClose: (reason: string) => void
 }
+
+type Log = (line: string) => void
 
 /**
  * An account's voice settings, read for each call so a save applies to the
@@ -83,12 +87,39 @@ export function testSettings(model?: ModelId, voice?: string): VoiceSettings {
   }
 }
 
-/** Connects the session of the settings' active model. */
-export function connectFor(
+function openaiKey(keys: VoiceKeys): string {
+  if (!keys.openai) {
+    throw new Error("Set OPENAI_API_KEY")
+  }
+  return keys.openai
+}
+
+/** What a call takes from the settings. */
+export function callOptions(
   settings: VoiceSettings,
   language: CallLanguage,
   keys: VoiceKeys,
-  options: SessionOptions
+  log: Log
+) {
+  return {
+    style: settings.style[language],
+    maxCallSeconds: settings.max_call_seconds,
+    // A session billed by the minute costs money from the moment it connects,
+    // and nobody pays for a call that isn't answered.
+    connectWhenAnswered:
+      modelInfo(settings.active_model).defaultPrices.kind === "minute",
+    connect: (options: SessionOptions) =>
+      connectFor(settings, language, keys, options, log),
+  }
+}
+
+/** Connects the session of the settings' active model. */
+export async function connectFor(
+  settings: VoiceSettings,
+  language: CallLanguage,
+  keys: VoiceKeys,
+  options: SessionOptions,
+  log?: Log
 ): Promise<VoiceSession> {
   const id = settings.active_model
   const model = modelSettings(settings, id)
@@ -104,7 +135,21 @@ export function connectFor(
         ...options,
       })
     case "openai-realtime":
+      return connectOpenAIRealtime({
+        apiKey: openaiKey(keys),
+        model: id,
+        voice,
+        settings: model,
+        log,
+        ...options,
+      })
     case "openai-live":
-      throw new Error(`${provider} isn't connected yet`)
+      return connectGptLive({
+        apiKey: openaiKey(keys),
+        voice,
+        backendModel: String(model.backend_model),
+        log,
+        ...options,
+      })
   }
 }

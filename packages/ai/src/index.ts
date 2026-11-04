@@ -37,7 +37,7 @@ export type Usage = {
   seconds?: number
 }
 
-/** One spoken conversation with a model; only src/gemini knows which one. */
+/** One spoken conversation with a model; only its own folder knows which one. */
 export interface VoiceSession {
   sendAudio(pcm: Buffer, sampleRate: number): void
   onAudio(listener: (pcm24k: Buffer) => void): void
@@ -52,8 +52,11 @@ export interface VoiceSession {
   start(openingText: string): void
   /** Tells the model what to do now, such as that the call's time is up. */
   instruct(text: string): void
-  close(): void
+  /** Settles once whatever the session still had to report has come. */
+  close(): void | Promise<void>
 }
 
 export * from "./gemini/live.js"
+export * from "./openai/live.js"
+export * from "./openai/realtime.js"
 export * from "./settings.js"
