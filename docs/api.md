@@ -199,7 +199,7 @@ A client asks for a design made from its own parts: it sends them as a JSON Sche
 ```
 
 - **`schema`:** the design's JSON Schema, at most 200 KB. Its root is a plain object. The model is asked for strict JSON: every property listed in `required`, `additionalProperties: false`, optional values nullable, and `anyOf` (not `oneOf` or `allOf`) for a choice of shapes. The answer is checked against it, and asked for once more when it doesn't match.
-- **`photos`:** at most 8 public `https` addresses; the model looks at them.
+- **`photos`:** at most 8 public `https` addresses of JPEG, PNG, GIF or WebP images, at most 4 MB each and 16 MB together. NexusAI downloads them and sends them to the model inline; a photo it can't download fails the generation.
 - **`language`:** `ar` (Modern Standard Arabic) or `fr`, for every text the shopper reads.
 - **Images:** a field that holds an image takes a string, so it should allow `null` too:
   - `photo:<n>` is the client's photo `n`, counted from 0;

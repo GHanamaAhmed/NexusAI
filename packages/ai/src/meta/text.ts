@@ -38,7 +38,7 @@ export async function generateJson(
     reasoning: ReasoningEffort
     system: string
     user: string
-    /** Public https addresses of the images the model looks at. */
+    /** The images the model looks at: https or data addresses. */
     images: readonly string[]
     schema: Record<string, unknown>
   }

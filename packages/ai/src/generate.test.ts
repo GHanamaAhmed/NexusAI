@@ -67,6 +67,11 @@ const VALID = {
 function fakeMeta(answers: unknown[], images: { fail?: boolean } = {}) {
   const bodies: Record<string, any>[] = []
   const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+    if (url.startsWith("https://files.example/")) {
+      return new Response(Buffer.from("photo"), {
+        headers: { "content-type": "image/jpeg" },
+      })
+    }
     const body = JSON.parse(init.body as string)
     bodies.push(body)
     if (url.endsWith("/images/generations")) {
@@ -132,6 +137,10 @@ describe("generateDesign", () => {
     expect(text!.instructions).toContain("Modern Standard Arabic")
     expect(text!.instructions).toContain("A home page with a banner first.")
     expect(text!.text.format.schema).toEqual(SCHEMA)
+    expect(text!.input[0].content[1]).toEqual({
+      type: "input_image",
+      image_url: `data:image/jpeg;base64,${Buffer.from("photo").toString("base64")}`,
+    })
     expect(images.map((body) => body.size).sort()).toEqual([
       "1024x1280",
       "1792x1024",

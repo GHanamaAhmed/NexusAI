@@ -76,7 +76,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 256m
+    # Two designs at once, each with up to 16 MB of photos sent inline.
+    mem_limit: 384m
     logging: *logging
 
   # Dials queued calls and holds the conversations. Host networking, to reach

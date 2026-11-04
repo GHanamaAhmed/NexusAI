@@ -18,6 +18,7 @@ import {
 import { GenerationError } from "./meta/client.js"
 import { generateImage } from "./meta/image.js"
 import { generateJson, type TextUsage } from "./meta/text.js"
+import { inlinePhotos } from "./photos.js"
 
 export type GenerationInput = {
   schema: Record<string, unknown>
@@ -85,6 +86,7 @@ export async function generateDesign(
     maxImages: input.max_generated_images,
   })}\n\n${input.instructions}`
   const check = answerChecker(input.schema)
+  const photos = await inlinePhotos(input.photos, deps.fetchImpl)
   const usage: TextUsage[] = []
   const ask = async (user: string) => {
     const answer = await generateJson({
@@ -93,7 +95,7 @@ export async function generateDesign(
       reasoning: deps.reasoning ?? textModel(textId).defaultReasoning,
       system,
       user,
-      images: input.photos,
+      images: photos,
       schema: input.schema,
     })
     usage.push(answer.usage)
