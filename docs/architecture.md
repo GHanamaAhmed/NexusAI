@@ -1,19 +1,19 @@
 # Architecture
 
-NexusAI calls customers about their cash-on-delivery orders and tells the platform what they said. Everything runs on one server, in containers started by `deploy/compose.yml`.
+NexusAI calls customers about their cash-on-delivery orders and tells the platform what they said, and designs store pages from a platform's own parts. Everything runs on one server, in containers started by `deploy/compose.yml`.
 
 ## The parts
 
-| Part     | What it does                                                                                                                                               | Code                 |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Caddy    | HTTPS for the API, with certificates from Let's Encrypt; the only way in from the internet                                                                 | `deploy/compose.yml` |
-| API      | Takes tasks from platforms, answers questions about them, cancels them                                                                                     | `apps/api`           |
-| Worker   | Asks the platform before each call, queues it, turns finished calls into signed results, retries their delivery, deletes old tasks, pings the health check | `apps/worker`        |
-| Voice    | Takes queued calls, dials them through Asterisk, holds the conversation with the active voice model, writes the result                                     | `apps/voice`         |
-| Asterisk | Signs in the ten phone lines and carries the calls                                                                                                         | `deploy/asterisk`    |
-| Postgres | Tasks, attempts, results waiting to be delivered, the lines' state, each account's voice settings                                                          | `packages/db`        |
+| Part     | What it does                                                                                                                                                             | Code                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| Caddy    | HTTPS for the API, with certificates from Let's Encrypt; the only way in from the internet                                                                               | `deploy/compose.yml` |
+| API      | Takes tasks and design requests from platforms, answers questions about them, cancels tasks, keeps each account's voice settings                                         | `apps/api`           |
+| Worker   | Asks the platform before each call, queues it, turns finished calls into signed results, retries their delivery, makes designs, deletes old data, pings the health check | `apps/worker`        |
+| Voice    | Takes queued calls, dials them through Asterisk, holds the conversation with the active voice model, writes the result                                                   | `apps/voice`         |
+| Asterisk | Signs in the ten phone lines and carries the calls                                                                                                                       | `deploy/asterisk`    |
+| Postgres | Tasks, attempts, results waiting to be delivered, the lines' state, each account's voice settings, designs and their images                                              | `packages/db`        |
 
-The shared code is in `packages`: `core` (outcomes, call hours, retries, phone numbers), `conversation` (the agent's instruction and functions), `places` (the 69 wilayas and 1,541 communes), `ai` (the voice sessions, the catalogue of models and their settings) and `webhooks` (signing and delivery).
+The shared code is in `packages`: `core` (outcomes, call hours, retries, phone numbers), `conversation` (the agent's instruction and functions), `places` (the 69 wilayas and 1,541 communes), `ai` (the voice sessions, the catalogues of voice and design models with their settings and prices, and the clients for Meta's design models) and `webhooks` (signing and delivery).
 
 ## A call, from order to result
 
@@ -44,19 +44,22 @@ Every call goes through `VoiceSession` (`packages/ai/src/index.ts`), so the call
 
 A client sends the parts a design may use, as a JSON Schema, with its instructions, a brief and some photos (`docs/api.md`, Designs). The worker runs at most two at once:
 
-1. **The text model** (`muse-wonder-1.0`, `packages/ai/src/meta/text.ts`) answers in JSON that matches the schema, from NexusAI's own rules, the client's instructions, the brief and the photos. The answer is streamed, so a long one doesn't time out.
-2. **The answer is checked** against the schema (`packages/ai/src/generation-schema.ts`), since the provider doesn't say which keywords it enforces, and asked for once more with its problems.
-3. **The images it asked for** are made by `muse-image-1.0`, wide or tall, at most as many as the client allowed, and kept in `generation_image` until the generation is purged.
-4. **The cost** adds up every request at the catalogue's prices (`packages/ai/src/generation-catalog.ts`), so more models can be added as data.
+1. **The photos are downloaded first** (`packages/ai/src/photos.ts`) and sent to the model inline, since Meta refuses to fetch a photo by its address. Each must be a JPEG, PNG, GIF or WebP of at most 4 MB, 16 MB together; one that can't be downloaded fails the generation.
+2. **The text model** (`muse-wonder-1.0`, `packages/ai/src/meta/text.ts`) answers in JSON that matches the schema, from NexusAI's own rules, the client's instructions, the brief and the photos, at low reasoning effort. The answer is streamed, so a long one doesn't time out.
+3. **The answer is checked** against the schema (`packages/ai/src/generation-schema.ts`), since the provider doesn't say which keywords it enforces, and asked for once more with its problems.
+4. **The images it asked for** are made by `muse-image-1.0`, wide or tall, at most as many as the client allowed, and kept in `generation_image` until the generation is purged. An image that can't be made becomes `null` and is named in the result's problems.
+5. **The cost** adds up every request at the catalogue's prices (`packages/ai/src/generation-catalog.ts`), so more models can be added as data.
+
+A generation that fails is marked failed and not tried again; the client starts another. One still running after 15 minutes is counted as failed, unless this worker is the one running it.
 
 NexusAI knows nothing of the client's parts beyond the schema it sends.
 
 ## Data
 
 - **What a task holds:** the store's name, the customer's name, phone and language, the items, the total and the delivery place. Nothing else about the customer.
-- **How long:** 30 days, then the task and its attempts and results are deleted.
+- **How long:** 30 days, then the task and its attempts and results are deleted. A design, with its brief, photo addresses and images, is deleted after 7 days.
 - **Calls:** no audio is stored. The attempt keeps what the agent said, not the customer's side, whose transcription comes out in other languages.
-- **The customer's voice goes to the active model's provider** during the call: Google for Gemini, OpenAI for the others.
+- **The customer's voice goes to the active model's provider** during the call: Google for Gemini, OpenAI for the others. A design's brief and photos go to Meta.
 - **Logs** hold no phone numbers and no conversation.
 - **Backups:** a dump every night at 03:30 UTC, the last seven kept on the server, none elsewhere.
 
@@ -65,3 +68,4 @@ NexusAI knows nothing of the client's parts beyond the schema it sends.
 - Calls: 09:00 to 20:00 Algiers time, three tries per task, at most 150 seconds each from the answer unless the account's settings say otherwise (60 to 600).
 - With Gemini, a call costs about 1.5 US cents for a plain yes and 3 to 5 cents with a change of place, plus the phone line's minutes. Each attempt records its own cost (`docs/telephony.md`, Usage).
 - With GPT-Live, calls of 32 to 54 seconds cost 3 to 5 US cents at $0.05 a minute, its backend's tokens included, plus the phone line's minutes.
+- Designs: at most two at once on the worker and three waiting or running per account. In tests with schemas of 10 to 20 KB and four images, one took 24 to 57 seconds and cost 7 to 11 US cents.

@@ -100,6 +100,17 @@ sudo docker run --rm --network host --env-file /srv/nexus/.env --env-file /srv/n
 
 `--model` tries another voice model: `gemini-3.8-live`, `gpt-realtime-2.1`, `gpt-realtime-2.1-mini` or `gpt-live-1`, with each model's default voices and settings. OpenAI's need `OPENAI_API_KEY` in `/srv/nexus/.env`. It also prints what the call cost at that model's default prices. `dialogue-test.ts` and `voice-test.ts` take `--model` too, except for GPT-Live, which takes no typed customer. On `volunteer-calls.ts`, `--model` keeps each model's results in their own file, `<label>.<model>.results.json`, so their scores can be compared.
 
+## Test design
+
+`apps/worker/src/generation-test.ts` runs one design with the real keys, outside the queue, and prints how long it took, what it cost, the problems and the shape of the design. Its input is what a client sends to `POST /v1/generations` (`docs/api.md`, Designs), as a JSON file. Run it in the worker's container, with the input on stdin, so no file has to be copied onto the server:
+
+```sh
+ssh -o IdentitiesOnly=yes -i ~/.ssh/nexus_ops ops@<server> \
+  'sudo docker exec -i nexus-worker-1 node --import tsx src/generation-test.ts /dev/stdin /tmp/design-test' < input.json
+```
+
+A third argument sets the reasoning effort (`minimal`, `low`, `medium`, `high`, `xhigh` or `max`; `low` by default, and higher was no better in tests). The design and its images are written to the folder given, inside the container: read them with `sudo docker exec nexus-worker-1 cat /tmp/design-test/design.json`, then delete the folder. Each run is billed by Meta, at the prices in `packages/ai/src/generation-catalog.ts`.
+
 ## Volunteer calls
 
 The volunteer test measures how well the calls understand people answering in their own words. Each volunteer gets a card of scenarios, and `apps/voice/src/volunteer-calls.ts` calls them once per scenario, in the card's order, with a made-up order each time. A call is right when its outcome is one the scenario expects.
@@ -122,4 +133,4 @@ The volunteer test measures how well the calls understand people answering in th
      sh -c './node_modules/.bin/tsx src/volunteer-score.ts /volunteers/*.results.json'
    ```
 
-   It prints a table of numbers only, for `docs/benchmark.md`. Delete the cards and results 30 days after scoring, or sooner if a volunteer asks.
+   It prints a table of numbers only, with no names or phone numbers, ready to keep with the test's notes. Delete the cards and results 30 days after scoring, or sooner if a volunteer asks.
