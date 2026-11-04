@@ -84,6 +84,8 @@ gunzip -c /srv/nexus/backups/nexus-<date>.sql.gz | sudo docker exec -i nexus-pos
 sudo docker compose -p nexus start api worker voice
 ```
 
+`LIVE_MODEL`, `VOICE_AR` and `VOICE_FR` are gone: the model and voices are in each account's voice settings (`docs/api.md`, Voice settings), and their defaults are the values these held. Once a release that reads the defaults is live, `VOICE_AR` and `VOICE_FR` can be deleted from the environment's variables.
+
 ## Test call
 
 `apps/voice/src/demo.ts` calls one phone through one line with a made-up order and prints the conversation, the outcome, the tokens and the cost. It refuses a number that isn't in `ALLOWED_NUMBERS` (read from `/srv/nexus/.env`). Test calls run next to the voice app, with their own Asterisk app (`nexus-test`) and audio port (8788, `nexus_media_test` in `websocket_client.conf`), so nothing is stopped and the health check stays green. Use a line the voice app isn't calling on. Run it only with the owner's agreement, from a copy of the repository on the server:

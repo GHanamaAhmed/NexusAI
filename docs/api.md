@@ -121,6 +121,65 @@ Any `2xx` answer counts as delivered. Anything else, or no answer within 10 seco
 | `machine`        | Voicemail answered; the agent said nothing                | no    |
 | `no_input`       | Answered, but no answer was reached                       | no    |
 
+## Voice settings
+
+Which voice model an account's calls use, and how they sound. Each account reads and changes only its own, with its own key. Until it saves anything, calls use the defaults: `gemini-3.8-live`, the voices `Callirrhoe` and `Kore`, the standard wording and a longest call of 150 seconds. A save applies from the next call.
+
+| Request                  | What it does                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /v1/voice/models`   | The models NexusAI can run: their voices, the settings each takes with their ranges, their prices, and `available` when its API key is set |
+| `GET /v1/voice/settings` | The settings with every model filled in, their `version` (0 until the first save), and the default wording as `defaults`                   |
+| `PUT /v1/voice/settings` | Saves `{ "settings": ..., "version": <the version you read> }` whole, and returns the new `version`                                        |
+| `POST /v1/voice/preview` | Takes `{ "language": "ar" }`, with an optional `style`, and returns the `instruction` a sample order would get. It saves nothing           |
+
+```json
+{
+  "active_model": "gpt-realtime-2.1",
+  "models": {
+    "gpt-realtime-2.1": {
+      "voices": { "ar": "marin", "fr": "cedar" },
+      "vad": "server_vad",
+      "silence_ms": 700,
+      "threshold": 0.5,
+      "prefix_padding_ms": 300,
+      "reasoning": "low",
+      "speed": 1,
+      "noise_reduction": "off",
+      "prices": {
+        "kind": "tokens",
+        "text_in": 4,
+        "cached_text_in": 0.4,
+        "audio_in": 32,
+        "cached_audio_in": 0.4,
+        "text_out": 24,
+        "audio_out": 64
+      }
+    }
+  },
+  "style": {
+    "ar": { "greeting": null, "speaking": null, "extra_rules": null },
+    "fr": {
+      "greeting": "Bonjour {name}, ici la boutique",
+      "speaking": null,
+      "extra_rules": null
+    }
+  },
+  "max_call_seconds": 150
+}
+```
+
+- **A model's settings** may name only what the catalogue says it takes, within its ranges. What's left out keeps its default.
+- **`style`** holds the parts of the instruction an admin may change, per language; `null` is the default text. The greeting must contain `{name}` once and no other placeholder. The call's steps and functions can't be changed.
+- **`max_call_seconds`** runs from the answer, from 60 to 600. At the limit the model says goodbye and the call ends.
+- **`prices`** are in US dollars: per million tokens, or for GPT-Live per minute and per million tokens of its backend model. Each attempt's cost uses the prices saved when the call started.
+
+| Answer | Code                | When                                                  |
+| ------ | ------------------- | ----------------------------------------------------- |
+| `400`  | `invalid_settings`  | The settings don't fit; `problems` says which and why |
+| `400`  | `model_unavailable` | The active model's API key isn't set                  |
+| `400`  | `invalid_preview`   | The language or the style doesn't fit                 |
+| `409`  | `version_conflict`  | Someone saved since you read; read again              |
+
 ## Signatures
 
 Both the check and the results carry `x-nexus-signature: t=<unix seconds>,v1=<hex>`, where the hex is the HMAC-SHA256 of `<t>.<raw body>` with the account's webhook secret. To verify:

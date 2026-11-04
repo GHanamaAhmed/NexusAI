@@ -27,6 +27,16 @@ Pressing keys on the mobile reaches nothing. On a healthy 72-second call:
 
 Two Algerian mobile networks behaved the same way, so the limit is in the provider's service. Landlines are not tested. Enabling `telephone-event` is a question for the provider.
 
+## Audio per model
+
+Asterisk carries each call as 16-bit PCM at 24 kHz (`slin24`), and every model takes and gives the same, so nothing is converted on a call. `packages/ai/src/resample.ts` converts for a session handed another rate.
+
+| Model                      | In and out                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `gemini-3.8-live`          | PCM; it answers at 24 kHz                                                        |
+| `gpt-realtime-2.1`, `mini` | PCM at 24 kHz only                                                               |
+| `gpt-live-1`               | PCM at 16 or 24 kHz, or G.711 at 8 kHz, the same both ways; calls use 24 kHz PCM |
+
 ## Voices
 
 Chosen by listening on real calls: `Callirrhoe` for Darija, `Kore` for French, as the defaults of the account's voice settings (`GET /v1/voice/settings`). Totals are said in words, spelled by the code ("ستة آلاف وخمسمية دينار"), never left to the model.
