@@ -1,11 +1,52 @@
-# NexusAI
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img src="docs/assets/logo-light.svg" alt="NexusAI" width="360">
+  </picture>
+</p>
 
-NexusAI is a service that commerce platforms call over HTTPS to hand work to AI:
+<p align="center">
+  <strong>AI phone confirmations and store designs, as a service for commerce platforms.</strong><br>
+  Built for Algeria: Darija and French on the phone, the 69 wilayas, cash on delivery.
+</p>
+
+<p align="center">
+  <a href="https://github.com/GHanamaAhmed/NexusAI/actions/workflows/deploy.yml"><img src="https://github.com/GHanamaAhmed/NexusAI/actions/workflows/deploy.yml/badge.svg?branch=main" alt="Deploy"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D22-006233" alt="Node.js 22 or later">
+</p>
+
+<p align="center">
+  <a href="docs/api.md">API</a> &middot;
+  <a href="docs/architecture.md">Architecture</a> &middot;
+  <a href="docs/telephony.md">Telephony</a> &middot;
+  <a href="deploy/README.md">Releases</a>
+</p>
+
+---
+
+NexusAI is a service that commerce platforms call over HTTPS to hand work to AI. Each platform has its own account, keys and webhook secret, and its own settings for how calls sound. NexusAI keeps only what the work needs, for as long as it needs it.
+
+## Features
 
 - **Order confirmation calls.** NexusAI phones the customer of a cash-on-delivery order, talks with them in Algerian Darija or French, and sends the platform what they decided: confirmed, cancelled, a new delivery place, call me later, and more.
-- **Store designs.** A platform describes the parts a store page may use, as a JSON Schema, with a brief and some photos. NexusAI returns a design that matches the schema, with the banners it was asked to make.
+- **Checks the code enforces.** A confirmation or a change of place needs the customer's own yes; a new place must be one of the 1,541 communes the agent looked up and said back.
+- **Four voice models behind one interface,** chosen per account: Gemini 3.8 Live, GPT Realtime 2.1 and its mini, and GPT-Live. Each call records its model, its answered seconds and its cost.
+- **Store designs.** A platform sends the parts a page may use as a JSON Schema, with a brief and photos, and gets back a design that matches it, with generated banners. In tests a design took 25 to 60 seconds and cost under 11 US cents.
+- **Built to be trusted with calls.** Nothing is dialed unless calls are switched on, and only numbers on an allow list; every result is signed; tasks are deleted after 30 days and no audio is kept.
+- **Released safely.** Every push is tested, scanned, signed and released with health checks and an automatic rollback.
 
-Each platform has its own account, keys and webhook secret, and its own settings for how calls sound. NexusAI keeps only what the work needs, for as long as it needs it.
+## Built with
+
+| Layer         | Technology                                                                           |
+| ------------- | ------------------------------------------------------------------------------------ |
+| Language      | TypeScript on Node.js 24, in a pnpm workspace                                        |
+| API           | Fastify 5, with Zod for validation                                                   |
+| Data          | PostgreSQL 17, through Kysely                                                        |
+| Telephony     | Asterisk 22 on SIP lines over TLS, audio to the voice app over WebSocket             |
+| Voice models  | Google Gemini Live and OpenAI Realtime and GPT-Live                                  |
+| Design models | Meta's Muse Wonder (text) and Muse Image (images)                                    |
+| Delivery      | Docker Compose behind Caddy; images signed with Sigstore cosign and scanned by Trivy |
+| Server and CI | Ansible for the server, GitHub Actions for checks, builds and releases               |
 
 ## Contents
 
