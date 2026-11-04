@@ -84,6 +84,8 @@ gunzip -c /srv/nexus/backups/nexus-<date>.sql.gz | sudo docker exec -i nexus-pos
 sudo docker compose -p nexus start api worker voice
 ```
 
+A new setting needs one step before its release. `apply-secrets` refuses any setting it doesn't know, and the server runs its own installed copy, which only the playbook updates (`infra/ansible`, `--tags nexus`). So run the playbook first, then push; a release that fails this way has changed nothing, and its failed job can be re-run after the playbook. The same goes for any other change to `deploy/bin/deploy`, `deploy/bin/apply-secrets` or `deploy/bin/backup`.
+
 `LIVE_MODEL`, `VOICE_AR` and `VOICE_FR` are gone: the model and voices are in each account's voice settings (`docs/api.md`, Voice settings), and their defaults are the values these held. Once a release that reads the defaults is live, `VOICE_AR` and `VOICE_FR` can be deleted from the environment's variables.
 
 ## Test call
