@@ -142,8 +142,44 @@ async function voiceSettingsDown(db: Kysely<unknown>) {
   await sql`DROP TABLE voice_settings`.execute(db)
 }
 
+async function generationsUp(db: Kysely<unknown>) {
+  await sql`
+    CREATE TABLE generation (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      account_id uuid NOT NULL REFERENCES account ON DELETE CASCADE,
+      idempotency_key text NOT NULL,
+      external_store_id text NOT NULL,
+      status text NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'running', 'done', 'failed')),
+      input jsonb NOT NULL,
+      result jsonb,
+      error text,
+      cost jsonb,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      started_at timestamptz,
+      finished_at timestamptz,
+      purge_after timestamptz NOT NULL,
+      UNIQUE (account_id, idempotency_key)
+    );
+    CREATE INDEX generation_queue ON generation (status, created_at);
+    CREATE TABLE generation_image (
+      generation_id uuid NOT NULL REFERENCES generation ON DELETE CASCADE,
+      slot integer NOT NULL,
+      shape text NOT NULL CHECK (shape IN ('wide', 'tall')),
+      format text NOT NULL,
+      bytes bytea NOT NULL,
+      PRIMARY KEY (generation_id, slot)
+    );
+  `.execute(db)
+}
+
+async function generationsDown(db: Kysely<unknown>) {
+  await sql`DROP TABLE generation_image; DROP TABLE generation`.execute(db)
+}
+
 export const migrations: Record<string, Migration> = {
   "0001_initial": { up: initialUp, down: initialDown },
   "0002_call_results": { up: callResultsUp, down: callResultsDown },
   "0003_voice_settings": { up: voiceSettingsUp, down: voiceSettingsDown },
+  "0004_generations": { up: generationsUp, down: generationsDown },
 }

@@ -8,6 +8,7 @@
     "test": "vitest run --no-file-parallelism --passWithNoTests"
   },
   "dependencies": {
+    "@nexus/ai": "workspace:*",
     "@nexus/core": "workspace:*",
     "@nexus/db": "workspace:*",
     "@nexus/webhooks": "workspace:*",

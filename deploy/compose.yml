@@ -56,6 +56,8 @@ services:
       CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
       # Which models can be chosen; the API doesn't hold the key itself.
       VOICE_PROVIDERS: ${OPENAI_API_KEY:+openai}
+      # Whether designs can be made; the API doesn't hold the key itself.
+      TEXT_PROVIDERS: ${META_API_KEY:+meta}
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,6 +72,7 @@ services:
       DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
       CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
       HEALTHCHECK_URL: ${HEALTHCHECK_URL:-}
+      META_API_KEY: ${META_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

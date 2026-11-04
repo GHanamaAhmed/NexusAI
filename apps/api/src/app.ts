@@ -4,6 +4,7 @@ import type { Db } from "@nexus/db"
 import Fastify, { type FastifyRequest } from "fastify"
 import { sql } from "kysely"
 import { z } from "zod"
+import { registerGenerationRoutes } from "./generations.js"
 import { accountForKey } from "./keys.js"
 import { createTask, taskInputSchema } from "./tasks.js"
 import { registerVoiceRoutes } from "./voice-settings.js"
@@ -17,6 +18,8 @@ export async function buildApp(options: {
   allowHttpCallbacks: boolean
   /** Whose API keys the voice app has, besides Gemini's. */
   voiceProviders?: string[]
+  /** Whose API keys the worker has for designing. */
+  textProviders?: string[]
 }) {
   const { db, callWindow } = options
   const TaskInput = taskInputSchema(options.allowHttpCallbacks)
@@ -38,6 +41,12 @@ export async function buildApp(options: {
     db,
     account,
     providers: new Set(["gemini", ...(options.voiceProviders ?? [])]),
+  })
+
+  registerGenerationRoutes(app, {
+    db,
+    account,
+    providers: new Set(options.textProviders ?? []),
   })
 
   app.get("/health", async (_request, reply) => {

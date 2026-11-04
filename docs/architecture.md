@@ -40,6 +40,17 @@ Every call goes through `VoiceSession` (`packages/ai/src/index.ts`), so the call
 - **GPT-Live's functions run through a backend model** (Responses delegation), since its client delegation declares none. Its voice is told to ask for a function with `<|SpawnThinking|>` and to say nothing is settled until the result comes, and the backend is told it acts and doesn't speak (`packages/ai/src/openai/live.ts`). The voice model passes the conversation along and the backend decides which function to call. GPT-Live also reports no end of a turn and no interruption, so the call's own timers end the goodbye, and audio already sent keeps playing when the customer speaks over it.
 - **The instruction's protocol stays in code.** Only the greeting, the way of speaking and extra rules can change, so an edit can't break the functions the code relies on.
 
+## Designs
+
+A client sends the parts a design may use, as a JSON Schema, with its instructions, a brief and some photos (`docs/api.md`, Designs). The worker runs at most two at once:
+
+1. **The text model** (`muse-wonder-1.0`, `packages/ai/src/meta/text.ts`) answers in JSON that matches the schema, from NexusAI's own rules, the client's instructions, the brief and the photos. The answer is streamed, so a long one doesn't time out.
+2. **The answer is checked** against the schema (`packages/ai/src/generation-schema.ts`), since the provider doesn't say which keywords it enforces, and asked for once more with its problems.
+3. **The images it asked for** are made by `muse-image-1.0`, wide or tall, at most as many as the client allowed, and kept in `generation_image` until the generation is purged.
+4. **The cost** adds up every request at the catalogue's prices (`packages/ai/src/generation-catalog.ts`), so more models can be added as data.
+
+NexusAI knows nothing of the client's parts beyond the schema it sends.
+
 ## Data
 
 - **What a task holds:** the store's name, the customer's name, phone and language, the items, the total and the delivery place. Nothing else about the customer.

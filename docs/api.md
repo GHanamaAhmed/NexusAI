@@ -180,6 +180,59 @@ Which voice model an account's calls use, and how they sound. Each account reads
 | `400`  | `invalid_preview`   | The language or the style doesn't fit                 |
 | `409`  | `version_conflict`  | Someone saved since you read; read again              |
 
+## Designs
+
+A client asks for a design made from its own parts: it sends them as a JSON Schema, and the design that comes back matches it. Until `META_API_KEY` is set, `POST` answers `503 {"code": "generation_unavailable"}`.
+
+`POST /v1/generations`, with an `Idempotency-Key`; the same key again returns the same generation with `200`. It answers `202 { "id", "status": "queued" }`.
+
+```json
+{
+  "external_store_id": "store-42",
+  "schema": { "type": "object", "properties": { "...": {} } },
+  "instructions": "What each page is for, and which parts suit it.",
+  "brief": "What the shop sells, to whom, in what style.",
+  "photos": ["https://files.example.com/stores/42/shirt.jpg"],
+  "language": "ar",
+  "max_generated_images": 4
+}
+```
+
+- **`schema`:** the design's JSON Schema, at most 200 KB. Its root is a plain object. The model is asked for strict JSON: every property listed in `required`, `additionalProperties: false`, optional values nullable, and `anyOf` (not `oneOf` or `allOf`) for a choice of shapes. The answer is checked against it, and asked for once more when it doesn't match.
+- **`photos`:** at most 8 public `https` addresses; the model looks at them.
+- **`language`:** `ar` (Modern Standard Arabic) or `fr`, for every text the shopper reads.
+- **Images:** a field that holds an image takes a string, so it should allow `null` too:
+  - `photo:<n>` is the client's photo `n`, counted from 0;
+  - the model writes `generate:wide:<description>` or `generate:tall:<description>` for an image to make; NexusAI makes at most `max_generated_images` (0 to 4), with no text in them, and replaces each with `generated:<slot>`;
+  - a request over the limit, a photo that wasn't sent, or an image that couldn't be made becomes `null`.
+- An account may have 3 generations waiting or running at once (`429 {"code": "too_many_generations"}`). One takes about one to two minutes.
+
+`GET /v1/generations/:id` returns its state: `queued`, `running`, `done` or `failed`.
+
+```json
+{
+  "id": "…",
+  "status": "done",
+  "result": {
+    "design": { "...": "matches the schema" },
+    "images": [{ "slot": 0, "shape": "wide" }],
+    "problems": ["1 images could not be made"]
+  },
+  "error": null,
+  "cost": {
+    "usd": 0.29,
+    "text_model": "muse-wonder-1.0",
+    "image_model": "muse-image-1.0",
+    "input_tokens": 21000,
+    "cached_tokens": 3000,
+    "output_tokens": 9000,
+    "images": 4
+  }
+}
+```
+
+`GET /v1/generations/:id/images/:slot` returns an image's bytes (`image/webp`). A generation and its images are deleted after 7 days.
+
 ## Signatures
 
 Both the check and the results carry `x-nexus-signature: t=<unix seconds>,v1=<hex>`, where the hex is the HMAC-SHA256 of `<t>.<raw body>` with the account's webhook secret. To verify:

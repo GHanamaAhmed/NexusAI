@@ -26,6 +26,7 @@ They live in GitHub, under Settings, Environments, `production`. Change one ther
 | -------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
 | `GEMINI_API_KEY`                                               | secret   | The Gemini API key (paid tier)                                                               |
 | `OPENAI_API_KEY`                                               | secret   | Optional. OpenAI's API key; without it, OpenAI's voice models can't be chosen                |
+| `META_API_KEY`                                                 | secret   | Optional. Meta's Model API key; without it, designs can't be made                            |
 | `VOIP_LINES`                                                   | secret   | One phone line per row: `<number> <password>`, the number as the provider spells the account |
 | `HEALTHCHECK_URL`                                              | secret   | The health check's ping address (optional)                                                   |
 | `ALLOWED_NUMBERS`                                              | secret   | The only numbers called, separated by commas (`0XXXXXXXXX`), or `any`; unset calls none      |

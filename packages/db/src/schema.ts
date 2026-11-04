@@ -139,6 +139,40 @@ export interface VoiceSettingsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>
 }
 
+export type GenerationStatus = "queued" | "running" | "done" | "failed"
+
+export interface GenerationTable {
+  id: Generated<string>
+  account_id: string
+  idempotency_key: string
+  external_store_id: string
+  status: ColumnType<GenerationStatus, GenerationStatus | undefined>
+  input: JSONColumnType<Record<string, unknown>>
+  result: JSONColumnType<
+    Record<string, unknown> | null,
+    string | null,
+    string | null
+  >
+  error: string | null
+  cost: JSONColumnType<
+    Record<string, unknown> | null,
+    string | null,
+    string | null
+  >
+  created_at: CreatedAt
+  started_at: NullableTimestamp
+  finished_at: NullableTimestamp
+  purge_after: Timestamp
+}
+
+export interface GenerationImageTable {
+  generation_id: string
+  slot: number
+  shape: "wide" | "tall"
+  format: string
+  bytes: Buffer
+}
+
 export interface Database {
   account: AccountTable
   api_key: ApiKeyTable
@@ -148,6 +182,8 @@ export interface Database {
   webhook_delivery: WebhookDeliveryTable
   line_status: LineStatusTable
   voice_settings: VoiceSettingsTable
+  generation: GenerationTable
+  generation_image: GenerationImageTable
 }
 
 export type Task = Selectable<TaskTable>
