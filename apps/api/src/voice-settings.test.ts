@@ -117,6 +117,25 @@ describe("Voice settings", () => {
       expect(Object.keys(body.settings.models)).toHaveLength(4)
       expect(body.defaults.greeting.fr).toContain("{name}")
       expect(body.defaults.speaking.ar).toContain("Darija")
+      // The platform's hours until the account saves its own.
+      expect(body.settings.call_hours).toEqual({
+        opens: "09:00",
+        closes: "20:00",
+      })
+    })
+
+    it("save call hours, and refuse hours that close before they open", async () => {
+      const hours = { opens: "08:00", closes: "23:30" }
+      expect((await save({ ...longer, call_hours: hours }, 0)).statusCode).toBe(
+        200
+      )
+      expect((await read()).json().settings.call_hours).toEqual(hours)
+      const backwards = await save(
+        { ...longer, call_hours: { opens: "22:00", closes: "08:00" } },
+        1
+      )
+      expect(backwards.statusCode).toBe(400)
+      expect(backwards.json().code).toBe("invalid_settings")
     })
 
     it("save, moving the version on", async () => {

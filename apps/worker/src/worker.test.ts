@@ -123,6 +123,23 @@ describe("worker", () => {
       expect(task.next_attempt_at).toEqual(new Date("2026-10-31T08:00:00Z"))
     })
 
+    it("calls at night for an account whose hours are open then", async () => {
+      const { id } = await makeTask()
+      const { account_id } = await readTask(id)
+      await db
+        .insertInto("voice_settings")
+        .values({
+          account_id,
+          settings: JSON.stringify({
+            call_hours: { opens: "00:00", closes: "24:00" },
+          }),
+        })
+        .execute()
+      const check = vi.fn(async (_: CheckRequest) => true)
+      expect(await promoteDueTasks(db, { window, check, now: night })).toBe(1)
+      expect(check).toHaveBeenCalledOnce()
+    })
+
     it("leaves tasks that aren't due", async () => {
       const { id } = await makeTask()
       const early = new Date(noon.getTime() - 3_600_000)

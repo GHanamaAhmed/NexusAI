@@ -22,22 +22,22 @@ Every push to `main` is checked, built, signed and released to the server by `.g
 
 They live in GitHub, under Settings, Environments, `production`. Change one there, then re-run the Deploy workflow. Nothing secret is in this repository.
 
-| Name                                                           | Kind     | What it is                                                                                   |
-| -------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY`                                               | secret   | The Gemini API key (paid tier)                                                               |
-| `OPENAI_API_KEY`                                               | secret   | Optional. OpenAI's API key; without it, OpenAI's voice models can't be chosen                |
-| `META_API_KEY`                                                 | secret   | Optional. Meta's Model API key; without it, designs can't be made                            |
-| `VOIP_LINES`                                                   | secret   | One phone line per row: `<number> <password>`, the number as the provider spells the account |
-| `HEALTHCHECK_URL`                                              | secret   | The health check's ping address (optional)                                                   |
-| `ALLOWED_NUMBERS`                                              | secret   | The only numbers called, separated by commas (`0XXXXXXXXX`), or `any`; unset calls none      |
-| `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST`          | secret   | CI's key, the server's pinned host key, its address                                          |
-| `PROVIDER_HOST`                                                | variable | The provider's SIP address, `<ip>:<port>`                                                    |
-| `PROVIDER_ROUTE_NAME`                                          | variable | The host name in the provider's routing headers, pinned to `PROVIDER_HOST`'s address         |
-| `DIAL_FORMAT`                                                  | variable | `national` (`0XXXXXXXXX`) or `international` (`213XXXXXXXXX`)                                |
-| `PUBLIC_HOST`                                                  | variable | The API's public host name; Caddy gets its certificate for it                                |
-| `CALLS_ENABLED`                                                | variable | `true` lets the voice app dial; anything else, or unset, dials nothing                       |
-| `CALL_WINDOW`                                                  | variable | Call hours in Algiers time, `09:00-20:00` when unset                                         |
-| `MAX_CALLS_PER_LINE`, `MAX_CALLS_TOTAL`, `MAX_CALLS_PER_STORE` | variable | Calls at once: per line (1), in all (10), per store (3) when unset                           |
+| Name                                                           | Kind     | What it is                                                                                                              |
+| -------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                                               | secret   | The Gemini API key (paid tier)                                                                                          |
+| `OPENAI_API_KEY`                                               | secret   | Optional. OpenAI's API key; without it, OpenAI's voice models can't be chosen                                           |
+| `META_API_KEY`                                                 | secret   | Optional. Meta's Model API key; without it, designs can't be made                                                       |
+| `VOIP_LINES`                                                   | secret   | One phone line per row: `<number> <password>`, the number as the provider spells the account                            |
+| `HEALTHCHECK_URL`                                              | secret   | The health check's ping address (optional)                                                                              |
+| `ALLOWED_NUMBERS`                                              | secret   | The only numbers called, separated by commas (`0XXXXXXXXX`), or `any`; unset calls none                                 |
+| `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST`          | secret   | CI's key, the server's pinned host key, its address                                                                     |
+| `PROVIDER_HOST`                                                | variable | The provider's SIP address, `<ip>:<port>`                                                                               |
+| `PROVIDER_ROUTE_NAME`                                          | variable | The host name in the provider's routing headers, pinned to `PROVIDER_HOST`'s address                                    |
+| `DIAL_FORMAT`                                                  | variable | `national` (`0XXXXXXXXX`) or `international` (`213XXXXXXXXX`)                                                           |
+| `PUBLIC_HOST`                                                  | variable | The API's public host name; Caddy gets its certificate for it                                                           |
+| `CALLS_ENABLED`                                                | variable | `true` lets the voice app dial; anything else, or unset, dials nothing                                                  |
+| `CALL_WINDOW`                                                  | variable | The platform's call hours in Algiers time, `08:00-22:00` when unset; an account's own hours (voice settings) come first |
+| `MAX_CALLS_PER_LINE`, `MAX_CALLS_TOTAL`, `MAX_CALLS_PER_STORE` | variable | Calls at once: per line (1), in all (10), per store (3) when unset                                                      |
 
 The server makes its own internal passwords (`/srv/nexus/internal.env`: ARI's and the database's) once and never replaces them.
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
+  callHoursOf,
+  callWindowFromHours,
   FINAL_OUTCOMES,
   firstAttemptAt,
   isAlgerianMobile,
@@ -54,6 +56,15 @@ describe("call window", () => {
 describe("retries", () => {
   it("calls two minutes after the order", () => {
     expect(firstAttemptAt(algiers(30, 12), window)).toEqual(algiers(30, 12, 2))
+  })
+
+  it("waits as long as the client asks before the first call", () => {
+    expect(firstAttemptAt(algiers(30, 12), window, 45)).toEqual(
+      algiers(30, 12, 45)
+    )
+    expect(firstAttemptAt(algiers(30, 19, 30), window, 60)).toEqual(
+      algiers(31, 9)
+    )
   })
 
   it("holds a night order until the morning", () => {
@@ -158,5 +169,42 @@ describe("outcomes", () => {
     [null, "no_answer"],
   ] as const)("reads hang-up cause %s as %s", (cause, outcome) => {
     expect(unansweredOutcome(cause)).toBe(outcome)
+  })
+})
+
+describe("an account's call hours", () => {
+  const platform = parseCallWindow("08:00-22:00")
+
+  it("uses the hours the account saved", () => {
+    expect(
+      callWindowFromHours({ opens: "10:00", closes: "18:30" }, platform)
+    ).toEqual({
+      opens: 600,
+      closes: 1110,
+    })
+    expect(
+      callWindowFromHours({ opens: "00:00", closes: "24:00" }, platform)
+    ).toEqual({
+      opens: 0,
+      closes: 1440,
+    })
+  })
+
+  it.each([
+    null,
+    undefined,
+    { opens: "10:00" },
+    { opens: "9", closes: "18:00" },
+    { opens: "18:00", closes: "10:00" },
+    "08:00-22:00",
+  ])("keeps the platform's hours for %j", (hours) => {
+    expect(callWindowFromHours(hours, platform)).toBe(platform)
+  })
+
+  it("writes a window back as hours", () => {
+    expect(callHoursOf(parseCallWindow("08:05-22:00"))).toEqual({
+      opens: "08:05",
+      closes: "22:00",
+    })
   })
 })

@@ -41,6 +41,7 @@ export async function buildApp(options: {
     db,
     account,
     providers: new Set(["gemini", ...(options.voiceProviders ?? [])]),
+    callWindow,
   })
 
   registerGenerationRoutes(app, {

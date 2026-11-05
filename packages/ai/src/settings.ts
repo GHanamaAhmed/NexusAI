@@ -111,12 +111,29 @@ function checkModel(id: ModelId, settings: ModelSettings): string[] {
   return problems
 }
 
+const CLOCK = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/, "a time such as 08:00")
+
+/**
+ * When customers may be called, Algiers time, closing at 24:00 at the latest.
+ * Optional: settings saved before it existed keep the platform's hours.
+ */
+export const CallHoursSchema = z
+  .object({ opens: CLOCK, closes: CLOCK })
+  .strict()
+  .refine((hours) => hours.opens < hours.closes, {
+    message: "the calls must open before they close",
+    path: ["closes"],
+  })
+
 export const VoiceSettingsSchema = z
   .object({
     active_model: z.enum(MODEL_IDS),
     models: z.partialRecord(z.enum(MODEL_IDS), ModelSettingsSchema),
     style: z.object({ ar: StyleSchema, fr: StyleSchema }).strict(),
     max_call_seconds: z.number().int().min(60).max(600),
+    call_hours: CallHoursSchema.optional(),
   })
   .strict()
   .superRefine((settings, context) => {

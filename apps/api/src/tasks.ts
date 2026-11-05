@@ -1,5 +1,12 @@
-import { type CallWindow, firstAttemptAt, isAlgerianMobile } from "@nexus/core"
-import type { Db, TaskPayload } from "@nexus/db"
+import {
+  type CallWindow,
+  callWindowFromHours,
+  DEFAULT_FIRST_CALL_DELAY_MINUTES,
+  firstAttemptAt,
+  isAlgerianMobile,
+  MAX_FIRST_CALL_DELAY_MINUTES,
+} from "@nexus/core"
+import { callHoursByAccount, type Db, type TaskPayload } from "@nexus/db"
 import { z } from "zod"
 
 const RETENTION_MS = 30 * 24 * 60 * 60_000
@@ -55,6 +62,13 @@ export function taskInputSchema(allowHttpCallbacks: boolean) {
       callbacks: z
         .object({ outcome_url: callback, check_url: callback })
         .strict(),
+      /** How long after the order to make the first call; 2 by default. */
+      first_call_delay_minutes: z
+        .number()
+        .int()
+        .min(DEFAULT_FIRST_CALL_DELAY_MINUTES)
+        .max(MAX_FIRST_CALL_DELAY_MINUTES)
+        .optional(),
     })
     .strict()
 }
@@ -68,12 +82,15 @@ export async function createTask(
     accountId: string
     idempotencyKey: string
     task: TaskInput
+    /** The platform's call hours, for an account that saved none. */
     window: CallWindow
     now?: Date
   }
 ) {
-  const { accountId, idempotencyKey, task, window } = input
+  const { accountId, idempotencyKey, task } = input
   const now = input.now ?? new Date()
+  const hours = await callHoursByAccount(db, [accountId])
+  const window = callWindowFromHours(hours.get(accountId), input.window)
 
   const { id: clientStoreId } = await db
     .insertInto("client_store")
@@ -108,7 +125,11 @@ export async function createTask(
       language: task.customer.language,
       outcome_url: task.callbacks.outcome_url,
       check_url: task.callbacks.check_url,
-      next_attempt_at: firstAttemptAt(now, window),
+      next_attempt_at: firstAttemptAt(
+        now,
+        window,
+        task.first_call_delay_minutes
+      ),
       outcome: null,
       purge_after: new Date(now.getTime() + RETENTION_MS),
     })

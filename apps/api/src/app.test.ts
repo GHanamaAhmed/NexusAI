@@ -93,6 +93,63 @@ describe("API", () => {
     expect(stored.purge_after.getTime()).toBeGreaterThan(Date.now())
   })
 
+  it("waits as long as the client asks before the first call", async () => {
+    const before = Date.now()
+    const response = await send({ ...task, first_call_delay_minutes: 90 })
+    expect(response.statusCode).toBe(201)
+    const stored = await db
+      .selectFrom("task")
+      .select("next_attempt_at")
+      .executeTakeFirstOrThrow()
+    // At least the wait, later only if the call hours are closed then.
+    expect(stored.next_attempt_at.getTime()).toBeGreaterThanOrEqual(
+      before + 90 * 60_000 - 1000
+    )
+  })
+
+  it.each([0, 1, 1441, 2.5])(
+    "refuses a wait of %s minutes",
+    async (minutes) => {
+      const response = await send({
+        ...task,
+        first_call_delay_minutes: minutes,
+      })
+      expect(response.statusCode).toBe(400)
+      expect(response.json().code).toBe("invalid_task")
+    }
+  )
+
+  it("schedules within the account's own call hours", async () => {
+    const accountId = (
+      await db
+        .selectFrom("api_key")
+        .select("account_id")
+        .executeTakeFirstOrThrow()
+    ).account_id
+    const settings = {
+      active_model: "gemini-3.8-live",
+      models: {},
+      style: {
+        ar: { greeting: null, speaking: null, extra_rules: null },
+        fr: { greeting: null, speaking: null, extra_rules: null },
+      },
+      max_call_seconds: 150,
+      // Open all day: the first call is never held for the morning.
+      call_hours: { opens: "00:00", closes: "24:00" },
+    }
+    await db
+      .insertInto("voice_settings")
+      .values({ account_id: accountId, settings: JSON.stringify(settings) })
+      .execute()
+    const before = Date.now()
+    await send(task)
+    const stored = await db
+      .selectFrom("task")
+      .select("next_attempt_at")
+      .executeTakeFirstOrThrow()
+    expect(stored.next_attempt_at.getTime() - before).toBeLessThan(3 * 60_000)
+  })
+
   it("makes one task from a repeated request", async () => {
     const first = await send(task)
     const second = await send(task)

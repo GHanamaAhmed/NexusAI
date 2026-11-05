@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
-      CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+      CALL_WINDOW: ${CALL_WINDOW:-08:00-22:00}
       # Which models can be chosen; the API doesn't hold the key itself.
       VOICE_PROVIDERS: ${OPENAI_API_KEY:+openai}
       # Whether designs can be made; the API doesn't hold the key itself.
@@ -70,7 +70,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
-      CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+      CALL_WINDOW: ${CALL_WINDOW:-08:00-22:00}
       HEALTHCHECK_URL: ${HEALTHCHECK_URL:-}
       META_API_KEY: ${META_API_KEY:-}
     depends_on:
@@ -93,7 +93,7 @@ services:
       ARI_PASSWORD: ${ARI_PASSWORD:?}
       CALLS_ENABLED: ${CALLS_ENABLED:-false}
       ALLOWED_NUMBERS: ${ALLOWED_NUMBERS:-}
-      CALL_WINDOW: ${CALL_WINDOW:-09:00-20:00}
+      CALL_WINDOW: ${CALL_WINDOW:-08:00-22:00}
       DIAL_FORMAT: ${DIAL_FORMAT:-national}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       MAX_CALLS_PER_LINE: ${MAX_CALLS_PER_LINE:-}

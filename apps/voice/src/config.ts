@@ -39,7 +39,7 @@ export function loadConfig() {
     callsEnabled: process.env.CALLS_ENABLED === "true",
     /** Calls go only to these numbers; unset allows none. */
     allowedNumbers: parseAllowedNumbers(process.env.ALLOWED_NUMBERS),
-    callWindow: parseCallWindow(process.env.CALL_WINDOW ?? "09:00-20:00"),
+    callWindow: parseCallWindow(process.env.CALL_WINDOW ?? "08:00-22:00"),
     dialFormat,
     limits: {
       perLine: count("MAX_CALLS_PER_LINE", 1),

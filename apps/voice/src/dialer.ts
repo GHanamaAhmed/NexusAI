@@ -9,8 +9,9 @@ import {
   type Outcome,
   toDialString,
   unansweredOutcome,
+  callWindowFromHours,
 } from "@nexus/core"
-import type { Db } from "@nexus/db"
+import { callHoursByAccount, type Db } from "@nexus/db"
 import type { AriEvent } from "./ari.js"
 import type { CallResult } from "./call.js"
 import { callCost } from "./cost.js"
@@ -108,7 +109,7 @@ export class Dialer {
     }
     await this.requeueStale(now)
     const free = limits.total - this.running.size
-    if (!isWithinCallWindow(now, window) || free <= 0) {
+    if (free <= 0) {
       return 0
     }
     const lineCalls = new Map(
@@ -140,9 +141,23 @@ export class Dialer {
         .skipLocked()
         .execute()
       const picks: { row: (typeof queued)[number]; line: string }[] = []
+      const hours = await callHoursByAccount(
+        trx,
+        queued.map((row) => row.account_id)
+      )
       for (const row of queued) {
         if (picks.length === free) {
           break
+        }
+        // Each account's own call hours (the platform's when it saved none);
+        // a call outside them waits in the queue.
+        if (
+          !isWithinCallWindow(
+            now,
+            callWindowFromHours(hours.get(row.account_id), window)
+          )
+        ) {
+          continue
         }
         // Cancelled like a task the store no longer wants: no call, and no
         // result sent.

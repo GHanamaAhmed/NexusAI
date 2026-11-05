@@ -191,18 +191,18 @@ Outside production, the API accepts plain `http` callback addresses so a client 
 
 Each app reads its settings from the environment. The essentials:
 
-| Setting                                                        | Used by     | What it does                                                             |
-| -------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
-| `DATABASE_URL`                                                 | all         | The Postgres connection (required)                                       |
-| `GEMINI_API_KEY`                                               | voice       | Google's key for the default voice model                                 |
-| `OPENAI_API_KEY`                                               | voice       | Optional; enables OpenAI's voice models                                  |
-| `META_API_KEY`                                                 | worker      | Optional; enables store designs                                          |
-| `VOICE_PROVIDERS`, `TEXT_PROVIDERS`                            | API         | Which optional providers are set up, so the API holds none of their keys |
-| `CALLS_ENABLED`                                                | voice       | `true` lets the voice app dial; anything else dials nothing              |
-| `ALLOWED_NUMBERS`                                              | voice       | The only numbers it calls, or `any`; unset calls none                    |
-| `CALL_WINDOW`                                                  | API, worker | Call hours in Algiers time, `09:00-20:00` by default                     |
-| `MAX_CALLS_PER_LINE`, `MAX_CALLS_TOTAL`, `MAX_CALLS_PER_STORE` | voice       | How many calls run at once                                               |
-| `HEALTHCHECK_URL`                                              | worker      | Optional health-check ping                                               |
+| Setting                                                        | Used by     | What it does                                                                      |
+| -------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                 | all         | The Postgres connection (required)                                                |
+| `GEMINI_API_KEY`                                               | voice       | Google's key for the default voice model                                          |
+| `OPENAI_API_KEY`                                               | voice       | Optional; enables OpenAI's voice models                                           |
+| `META_API_KEY`                                                 | worker      | Optional; enables store designs                                                   |
+| `VOICE_PROVIDERS`, `TEXT_PROVIDERS`                            | API         | Which optional providers are set up, so the API holds none of their keys          |
+| `CALLS_ENABLED`                                                | voice       | `true` lets the voice app dial; anything else dials nothing                       |
+| `ALLOWED_NUMBERS`                                              | voice       | The only numbers it calls, or `any`; unset calls none                             |
+| `CALL_WINDOW`                                                  | API, worker | The platform's call hours, `08:00-22:00` by default; each account can set its own |
+| `MAX_CALLS_PER_LINE`, `MAX_CALLS_TOTAL`, `MAX_CALLS_PER_STORE` | voice       | How many calls run at once                                                        |
+| `HEALTHCHECK_URL`                                              | worker      | Optional health-check ping                                                        |
 
 The full list, with the phone line and provider settings, is in [`deploy/README.md`](deploy/README.md#settings-and-secrets). In production every setting and secret lives in the GitHub environment `production`; none is in this repository.
 

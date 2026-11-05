@@ -65,7 +65,7 @@ NexusAI knows nothing of the client's parts beyond the schema it sends.
 
 ## Limits and costs
 
-- Calls: 09:00 to 20:00 Algiers time, three tries per task, at most 150 seconds each from the answer unless the account's settings say otherwise (60 to 600).
+- Calls: inside the account's call hours (08:00 to 22:00 Algiers time unless it saved its own), the first one 2 minutes after the task unless the client asks for a longer wait, three tries per task, at most 150 seconds each from the answer unless the account's settings say otherwise (60 to 600).
 - With Gemini, a call costs about 1.5 US cents for a plain yes and 3 to 5 cents with a change of place, plus the phone line's minutes. Each attempt records its own cost (`docs/telephony.md`, Usage).
 - With GPT-Live, calls of 32 to 54 seconds cost 3 to 5 US cents at $0.05 a minute, its backend's tokens included, plus the phone line's minutes.
 - Designs: at most two at once on the worker and three waiting or running per account. In tests with schemas of 10 to 20 KB and four images, one took 24 to 57 seconds and cost 7 to 11 US cents.

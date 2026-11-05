@@ -39,17 +39,18 @@ A missing, wrong or revoked key gets `401 {"code": "unauthorized"}`. Each key ma
 }
 ```
 
-| Field               | Rule                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| `external_store_id` | The store in the platform, 1 to 100 characters                                                         |
-| `external_id`       | The order in the platform, 1 to 100 characters                                                         |
-| `reference`         | Optional: the order number the customer knows, up to 40 characters                                     |
-| `customer.phone`    | An Algerian mobile, `+213` then 5, 6 or 7 and eight digits; NexusAI dials nothing else                 |
-| `customer.language` | `ar` (Darija) or `fr`; the agent follows the customer if they speak the other one                      |
-| `order.items`       | 1 to 30, each a title (up to 120 characters) and a quantity (1 to 99)                                  |
-| `order.total`       | Whole dinars, said in words on the call                                                                |
-| `order.delivery`    | `home` or `stop_desk`; the wilaya by code (1 to 69); the commune's name in Arabic or French, or `null` |
-| `callbacks`         | HTTPS addresses for results and for the check before each call                                         |
+| Field                      | Rule                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `external_store_id`        | The store in the platform, 1 to 100 characters                                                         |
+| `external_id`              | The order in the platform, 1 to 100 characters                                                         |
+| `reference`                | Optional: the order number the customer knows, up to 40 characters                                     |
+| `customer.phone`           | An Algerian mobile, `+213` then 5, 6 or 7 and eight digits; NexusAI dials nothing else                 |
+| `customer.language`        | `ar` (Darija) or `fr`; the agent follows the customer if they speak the other one                      |
+| `order.items`              | 1 to 30, each a title (up to 120 characters) and a quantity (1 to 99)                                  |
+| `order.total`              | Whole dinars, said in words on the call                                                                |
+| `order.delivery`           | `home` or `stop_desk`; the wilaya by code (1 to 69); the commune's name in Arabic or French, or `null` |
+| `callbacks`                | HTTPS addresses for results and for the check before each call                                         |
+| `first_call_delay_minutes` | Optional: how long after the task to make the first call, 2 to 1,440 minutes; 2 when left out          |
 
 Answers: `201 {"id", "status"}` for a new task; `400 {"code": "idempotency_key_required"}`; `400 {"code": "invalid_task", "problems": [{"path", "message"}]}`.
 
@@ -61,7 +62,8 @@ Answers: `201 {"id", "status"}` for a new task; `400 {"code": "idempotency_key_r
 
 ## When calls happen
 
-- The first call comes 2 minutes after the task, between 09:00 and 20:00 Algiers time; outside those hours it waits for the next morning.
+- The first call comes 2 minutes after the task, or after `first_call_delay_minutes`, inside the account's call hours; outside them it waits for the next opening.
+- **Call hours** are the account's own when it saved them in its voice settings (`call_hours`), otherwise the platform's: 08:00 to 22:00 Algiers time unless `CALL_WINDOW` says otherwise.
 - Up to three calls: the second an hour after the first, the third the next day at 10:00. Only an unanswered call is tried again (see Outcomes).
 - **Before each call** NexusAI asks the platform whether it's still wanted, so a call never follows a confirmation made meanwhile.
 
@@ -166,12 +168,14 @@ Which voice model an account's calls use, and how they sound. Each account reads
       "extra_rules": null
     }
   },
-  "max_call_seconds": 150
+  "max_call_seconds": 150,
+  "call_hours": { "opens": "08:00", "closes": "22:00" }
 }
 ```
 
 - **A model's settings** may name only what the catalogue says it takes, within its ranges. What's left out keeps its default.
 - **`style`** holds the parts of the instruction an admin may change, per language; `null` is the default text. The greeting must contain `{name}` once and no other placeholder. The call's steps and functions can't be changed.
+- **`call_hours`** are when customers may be called, Algiers time, from `00:00` to `24:00`, opening before they close. Optional; settings without them use the platform's hours, which `GET` fills in.
 - **`max_call_seconds`** runs from the answer, from 60 to 600. At the limit the model says goodbye and the call ends.
 - **`prices`** are in US dollars: per million tokens, or for GPT-Live per minute and per million tokens of its backend model. Each attempt's cost uses the prices saved when the call started.
 

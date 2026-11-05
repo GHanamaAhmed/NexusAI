@@ -1,3 +1,4 @@
+import { type CallWindow, callHoursOf } from "@nexus/core"
 import {
   defaultVoiceSettings,
   fullVoiceSettings,
@@ -58,9 +59,11 @@ export function registerVoiceRoutes(
     account: (request: FastifyRequest) => Promise<string | null>
     /** Whose API keys the voice app has: "gemini", "openai". */
     providers: Set<string>
+    /** The platform's call hours, shown for an account that saved none. */
+    callWindow: CallWindow
   }
 ) {
-  const { db, account, providers } = options
+  const { db, account, providers, callWindow } = options
   const available = (provider: keyof typeof PROVIDER_KEY) =>
     providers.has(PROVIDER_KEY[provider])
 
@@ -94,10 +97,14 @@ export function registerVoiceRoutes(
       return reply
     }
     const row = await readRow(db, accountId)
+    const settings = fullVoiceSettings(
+      row ? readVoiceSettings(row.settings) : defaultVoiceSettings()
+    )
     return {
-      settings: fullVoiceSettings(
-        row ? readVoiceSettings(row.settings) : defaultVoiceSettings()
-      ),
+      settings: {
+        ...settings,
+        call_hours: settings.call_hours ?? callHoursOf(callWindow),
+      },
       version: row?.version ?? 0,
       defaults: { greeting: DEFAULT_GREETING, speaking: DEFAULT_SPEAKING },
     }

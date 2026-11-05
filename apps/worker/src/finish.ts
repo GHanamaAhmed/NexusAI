@@ -4,8 +4,14 @@ import {
   MAX_ATTEMPTS,
   nextAttemptAt,
   type Outcome,
+  callWindowFromHours,
 } from "@nexus/core"
-import type { AttemptChange, Db, DeliveryEvent } from "@nexus/db"
+import {
+  type AttemptChange,
+  callHoursByAccount,
+  type Db,
+  type DeliveryEvent,
+} from "@nexus/db"
 
 const BATCH = 20
 
@@ -73,6 +79,7 @@ export async function finishAttempts(
         "attempt.cost",
         "task.external_id",
         "task.reference",
+        "task.account_id",
         "client_store.external_id as external_store_id",
       ])
       .where("attempt.status", "=", "done")
@@ -84,12 +91,18 @@ export async function finishAttempts(
       .skipLocked()
       .execute()
 
+    const hours = await callHoursByAccount(
+      trx,
+      finished.map((attempt) => attempt.account_id)
+    )
     for (const attempt of finished) {
       const outcome = (attempt.outcome ?? "no_input") as Outcome
       const endedAt = attempt.ended_at ?? now
+      // The next try falls in the account's own call hours.
+      const own = callWindowFromHours(hours.get(attempt.account_id), window)
       const next = FINAL_OUTCOMES.has(outcome)
         ? null
-        : nextAttemptAt(attempt.number, endedAt, window)
+        : nextAttemptAt(attempt.number, endedAt, own)
       await trx
         .updateTable("task")
         .set(

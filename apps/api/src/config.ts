@@ -10,7 +10,7 @@ export function loadConfig() {
   return {
     databaseUrl: required("DATABASE_URL"),
     port: Number(process.env.PORT ?? 3000),
-    callWindow: process.env.CALL_WINDOW ?? "09:00-20:00",
+    callWindow: process.env.CALL_WINDOW ?? "08:00-22:00",
     /** Whose keys the voice app has besides Gemini's, without the keys. */
     voiceProviders: (process.env.VOICE_PROVIDERS ?? "")
       .split(",")

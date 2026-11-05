@@ -1,5 +1,10 @@
-import { type CallWindow, isWithinCallWindow, nextOpening } from "@nexus/core"
-import type { Db } from "@nexus/db"
+import {
+  type CallWindow,
+  callWindowFromHours,
+  isWithinCallWindow,
+  nextOpening,
+} from "@nexus/core"
+import { callHoursByAccount, type Db } from "@nexus/db"
 import { sign } from "@nexus/webhooks"
 
 const CHECK_TIMEOUT_MS = 5_000
@@ -39,8 +44,8 @@ export async function askClient(request: CheckRequest): Promise<boolean> {
 }
 
 /**
- * Takes the tasks that are due. Outside call hours they wait for the next
- * opening. Inside, each is checked with its client (outside the transaction,
+ * Takes the tasks that are due. Outside their account's call hours (the
+ * platform's, `window`, when it saved none) they wait for the next opening. Inside, each is checked with its client (outside the transaction,
  * so a slow client holds no lock) and either queued for a call or cancelled.
  */
 export async function promoteDueTasks(
@@ -56,7 +61,7 @@ export async function promoteDueTasks(
   const claimed = await db.transaction().execute(async (trx) => {
     const due = await trx
       .selectFrom("task")
-      .select("id")
+      .select(["id", "account_id"])
       .where("status", "=", "scheduled")
       .where("next_attempt_at", "<=", now)
       .orderBy("next_attempt_at")
@@ -64,16 +69,27 @@ export async function promoteDueTasks(
       .forUpdate()
       .skipLocked()
       .execute()
-    const ids = due.map((task) => task.id)
-    if (ids.length === 0) {
+    if (due.length === 0) {
       return []
     }
-    if (!isWithinCallWindow(now, window)) {
-      await trx
-        .updateTable("task")
-        .set({ next_attempt_at: nextOpening(now, window) })
-        .where("id", "in", ids)
-        .execute()
+    const hours = await callHoursByAccount(
+      trx,
+      due.map((task) => task.account_id)
+    )
+    const ids: string[] = []
+    for (const task of due) {
+      const own = callWindowFromHours(hours.get(task.account_id), window)
+      if (isWithinCallWindow(now, own)) {
+        ids.push(task.id)
+      } else {
+        await trx
+          .updateTable("task")
+          .set({ next_attempt_at: nextOpening(now, own) })
+          .where("id", "=", task.id)
+          .execute()
+      }
+    }
+    if (ids.length === 0) {
       return []
     }
     await trx

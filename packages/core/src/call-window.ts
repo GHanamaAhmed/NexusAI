@@ -62,3 +62,40 @@ export function nextOpening(at: Date, window: CallWindow): Date {
 export function nextDayAt(at: Date, minutes: number): Date {
   return afterMinutes(at, DAY_MINUTES - localMinutes(at) + minutes)
 }
+
+/** Call hours as an account saves them, such as `{ opens: "08:00", closes: "22:00" }`. */
+export type CallHours = { opens: string; closes: string }
+
+const HOURS_PATTERN = /^\d{2}:\d{2}$/
+
+/**
+ * An account's call window from its saved hours, or the platform's when it has
+ * saved none or they can't be read, so calls never stop over them.
+ */
+export function callWindowFromHours(
+  hours: unknown,
+  fallback: CallWindow
+): CallWindow {
+  const value = hours as Partial<CallHours> | null | undefined
+  if (
+    !value ||
+    typeof value.opens !== "string" ||
+    typeof value.closes !== "string" ||
+    !HOURS_PATTERN.test(value.opens) ||
+    !HOURS_PATTERN.test(value.closes)
+  ) {
+    return fallback
+  }
+  try {
+    return parseCallWindow(`${value.opens}-${value.closes}`)
+  } catch {
+    return fallback
+  }
+}
+
+/** A window as hours, for a form to show. */
+export function callHoursOf(window: CallWindow): CallHours {
+  const clock = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+  return { opens: clock(window.opens), closes: clock(window.closes) }
+}
