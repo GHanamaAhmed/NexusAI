@@ -12,7 +12,11 @@ import {
 } from "vitest"
 import { deliverWebhooks } from "./deliver.js"
 import { finishAttempts } from "./finish.js"
-import { isHealthy, purgeExpiredTasks } from "./housekeeping.js"
+import {
+  isHealthy,
+  purgeExpiredGenerations,
+  purgeExpiredTasks,
+} from "./housekeeping.js"
 import { type CheckRequest, promoteDueTasks } from "./promote.js"
 
 const window = parseCallWindow("09:00-20:00")
@@ -401,6 +405,44 @@ describe("worker", () => {
       expect(await purgeExpiredTasks(db, noon)).toBe(0)
       expect(await purgeExpiredTasks(db, later)).toBe(1)
       await expect(readTask(id)).rejects.toThrow()
+    })
+
+    it("deletes the last designs past their time, with their images", async () => {
+      const account = await db
+        .insertInto("account")
+        .values({ name: "One", webhook_secret: "secret" })
+        .returning("id")
+        .executeTakeFirstOrThrow()
+      const design = (key: string, purgeAfter: Date) =>
+        db
+          .insertInto("generation")
+          .values({
+            account_id: account.id,
+            idempotency_key: key,
+            external_store_id: "store-1",
+            input: JSON.stringify({}),
+            purge_after: purgeAfter,
+          })
+          .returning("id")
+          .executeTakeFirstOrThrow()
+      const old = await design("a", new Date(noon.getTime() - 1_000))
+      await design("b", new Date(noon.getTime() + 86_400_000))
+      await db
+        .insertInto("generation_image")
+        .values({
+          generation_id: old.id,
+          slot: 0,
+          shape: "tall",
+          format: "webp",
+          bytes: Buffer.from("x"),
+        })
+        .execute()
+      expect(await purgeExpiredGenerations(db, noon)).toBe(1)
+      const left = await db
+        .selectFrom("generation_image")
+        .select("slot")
+        .execute()
+      expect(left).toEqual([])
     })
 
     it("is healthy only while a line registered recently", async () => {

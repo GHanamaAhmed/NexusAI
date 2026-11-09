@@ -2,8 +2,6 @@
 
 A platform sends NexusAI an order to confirm. NexusAI calls the customer, talks with them in Algerian Darija or French, and sends back what they said. The platform stays the record of the order: NexusAI keeps a task for 30 days, then deletes it.
 
-A platform can also ask for a store design made from its own page parts ([Designs](#designs)).
-
 ## Keys
 
 Each platform has an account with API keys and a webhook secret, made on the server with the CLI (`deploy/README.md`). Every request carries a key:
@@ -185,63 +183,6 @@ Which voice model an account's calls use, and how they sound. Each account reads
 | `400`  | `model_unavailable` | The active model's API key isn't set                  |
 | `400`  | `invalid_preview`   | The language or the style doesn't fit                 |
 | `409`  | `version_conflict`  | Someone saved since you read; read again              |
-
-## Designs
-
-A client asks for a design made from its own parts: it sends them as a JSON Schema, and the design that comes back matches it. Until `META_API_KEY` is set, `POST` answers `503 {"code": "generation_unavailable"}`.
-
-`POST /v1/generations`, with an `Idempotency-Key`; the same key again returns the same generation with `200`. It answers `202 { "id", "status": "queued" }`.
-
-```json
-{
-  "external_store_id": "store-42",
-  "schema": { "type": "object", "properties": { "...": {} } },
-  "instructions": "What each page is for, and which parts suit it.",
-  "brief": "What the shop sells, to whom, in what style.",
-  "photos": ["https://files.example.com/stores/42/shirt.jpg"],
-  "language": "ar",
-  "max_generated_images": 4
-}
-```
-
-- **`schema`:** the design's JSON Schema, at most 200 KB. Its root is a plain object. The model is asked for strict JSON: every property listed in `required`, `additionalProperties: false`, optional values nullable, and `anyOf` (not `oneOf` or `allOf`) for a choice of shapes. The answer is checked against it, and asked for once more when it doesn't match.
-- **`photos`:** at most 8 public `https` addresses of JPEG, PNG, GIF or WebP images, at most 4 MB each and 16 MB together. NexusAI downloads them and sends them to the model inline; a photo it can't download fails the generation.
-- **`language`:** `ar` (Modern Standard Arabic) or `fr`, for every text the shopper reads.
-- **Images:** a field that holds an image takes a string, so it should allow `null` too:
-  - `photo:<n>` is the client's photo `n`, counted from 0;
-  - the model writes `generate:wide:<description>` or `generate:tall:<description>` for an image to make; NexusAI makes at most `max_generated_images` (0 to 4), with no text in them, and replaces each with `generated:<slot>`;
-  - a request over the limit, a photo that wasn't sent, or an image that couldn't be made becomes `null`.
-- An account may have 3 generations waiting or running at once (`429 {"code": "too_many_generations"}`). One takes about 25 to 60 seconds, and a generation still running after 15 minutes fails.
-
-`GET /v1/generations/:id` returns its state: `queued`, `running`, `done` or `failed`.
-
-```json
-{
-  "id": "…",
-  "status": "done",
-  "result": {
-    "design": { "...": "matches the schema" },
-    "images": [{ "slot": 0, "shape": "wide" }],
-    "problems": []
-  },
-  "error": null,
-  "cost": {
-    "usd": 0.08896,
-    "text_model": "muse-wonder-1.0",
-    "image_model": "muse-image-1.0",
-    "input_tokens": 555,
-    "cached_tokens": 0,
-    "output_tokens": 2337,
-    "images": 4
-  }
-}
-```
-
-- **`problems`** lists what NexusAI had to leave out, such as images that couldn't be made.
-- **`cost`** adds up every request at the catalogue's prices, in US dollars. With a schema of 10 to 20 KB and four images, tests cost $0.07 to $0.11.
-- **`error`** says why a `failed` generation stopped. A failed generation reports no cost (`cost` is `null`), although the provider may have billed the requests made before it failed.
-
-`GET /v1/generations/:id/images/:slot` returns an image's bytes (`image/webp`). A generation and its images are deleted after 7 days.
 
 ## Signatures
 

@@ -16,11 +16,6 @@ export function loadConfig() {
       .split(",")
       .map((provider) => provider.trim())
       .filter(Boolean),
-    /** Whose keys the worker has for designing, without the keys. */
-    textProviders: (process.env.TEXT_PROVIDERS ?? "")
-      .split(",")
-      .map((provider) => provider.trim())
-      .filter(Boolean),
     // Local development only: a client on this machine has no HTTPS.
     allowHttpCallbacks: process.env.NODE_ENV !== "production",
   }

@@ -56,8 +56,6 @@ services:
       CALL_WINDOW: ${CALL_WINDOW:-08:00-22:00}
       # Which models can be chosen; the API doesn't hold the key itself.
       VOICE_PROVIDERS: ${OPENAI_API_KEY:+openai}
-      # Whether designs can be made; the API doesn't hold the key itself.
-      TEXT_PROVIDERS: ${META_API_KEY:+meta}
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,12 +70,10 @@ services:
       DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:?}@postgres:5432/nexus
       CALL_WINDOW: ${CALL_WINDOW:-08:00-22:00}
       HEALTHCHECK_URL: ${HEALTHCHECK_URL:-}
-      META_API_KEY: ${META_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
-    # Two designs at once, each with up to 16 MB of photos sent inline.
-    mem_limit: 384m
+    mem_limit: 256m
     logging: *logging
 
   # Dials queued calls and holds the conversations. Host networking, to reach

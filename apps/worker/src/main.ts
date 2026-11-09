@@ -1,15 +1,13 @@
-import { generateDesign } from "@nexus/ai/generation"
 import { parseCallWindow } from "@nexus/core"
 import { createDb } from "@nexus/db"
 import { loadConfig } from "./config.js"
 import { deliverWebhooks } from "./deliver.js"
 import { finishAttempts } from "./finish.js"
 import {
-  failStaleGenerations,
-  GenerationRunner,
+  pingHealthcheck,
   purgeExpiredGenerations,
-} from "./generate.js"
-import { pingHealthcheck, purgeExpiredTasks } from "./housekeeping.js"
+  purgeExpiredTasks,
+} from "./housekeeping.js"
 import { promoteDueTasks } from "./promote.js"
 
 const config = loadConfig()
@@ -41,26 +39,6 @@ const timers = [
     await purgeExpiredGenerations(db)
   }),
 ]
-if (config.metaApiKey) {
-  const apiKey = config.metaApiKey
-  const runner = new GenerationRunner({
-    db,
-    limit: 2,
-    log: (line) => console.log(line),
-    generate: (input) =>
-      generateDesign(input, {
-        apiKey,
-        baseUrl: config.metaApiUrl,
-        log: (line) => console.log(line),
-      }),
-  })
-  timers.push(
-    every(3_000, "generate", () => runner.tick()),
-    every(60_000, "stale generations", () =>
-      failStaleGenerations(db, runner.runningIds)
-    )
-  )
-}
 if (config.healthcheckUrl) {
   const url = config.healthcheckUrl
   timers.push(every(60_000, "health", () => pingHealthcheck(db, url)))

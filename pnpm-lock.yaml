@@ -129,9 +129,6 @@ importers:
       '@google/genai':
         specifier: ^2.32.0
         version: 2.32.0
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       ws:
         specifier: ^8.22.0
         version: 8.22.0

@@ -12,6 +12,18 @@ export async function purgeExpiredTasks(db: Db, now = new Date()) {
   return Number(numDeletedRows)
 }
 
+/**
+ * Deletes designs past their retention, with their images. NexusAI no longer
+ * makes designs; this clears the last ones until their tables are dropped.
+ */
+export async function purgeExpiredGenerations(db: Db, now = new Date()) {
+  const { numDeletedRows } = await db
+    .deleteFrom("generation")
+    .where("purge_after", "<", now)
+    .executeTakeFirst()
+  return Number(numDeletedRows)
+}
+
 /** Healthy when the database answers and a line registered in the last while. */
 export async function isHealthy(db: Db, now = new Date()): Promise<boolean> {
   try {

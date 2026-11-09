@@ -10,7 +10,6 @@ const app = await buildApp({
   callWindow: parseCallWindow(config.callWindow),
   allowHttpCallbacks: config.allowHttpCallbacks,
   voiceProviders: config.voiceProviders,
-  textProviders: config.textProviders,
 })
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
